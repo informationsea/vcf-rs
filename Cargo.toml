@@ -1,0 +1,13 @@
+[package]
+name = "vcf"
+version = "0.1.0"
+authors = ["OKAMURA, Yasunobu <okamura@informationsea.info>"]
+edition = "2018"
+license = "Apache 2.0"
+
+[dependencies]
+failure = "0.1"
+indexmap = "1"
+
+[dev-dependencies]
+flate2 = "1"
