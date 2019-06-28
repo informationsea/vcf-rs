@@ -1,13 +1,19 @@
 #[macro_use]
 extern crate failure;
 
+mod reader;
+mod writer;
+
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
 use std::iter::Iterator;
 use std::str::FromStr;
 
 use indexmap::IndexMap;
+
+pub use reader::VCFReader;
+pub use writer::VCFWriter;
 
 #[derive(Fail, Debug)]
 pub enum VCFParseError {
@@ -250,73 +256,6 @@ pub struct VCFHeader {
 }
 
 
-#[derive(Debug)]
-pub struct VCFReader<R: io::BufRead> {
-    reader: R,
-    header: VCFHeader,
-}
-
-impl<R: io::BufRead> VCFReader<R> {
-    pub fn header(&self) -> &VCFHeader {
-        &self.header
-    }
-}
-
-impl<R: io::Read> VCFReader<io::BufReader<R>> {
-    pub fn new(read: R) -> Result<Self, VCFParseError> {
-        let mut reader = io::BufReader::new(read);
-        let mut header = VCFHeader {
-            items: Vec::new(),
-            samples: Vec::new(),
-        };
-
-        let mut line = String::new();
-        loop {
-            line.clear();
-            let read_bytes = reader
-                .read_line(&mut line)
-                .map_err(|e| VCFParseError::IoError { error: e })?;
-            if read_bytes == 0 {
-                break;
-            }
-
-            if line.starts_with("##") {
-                header.items.push(line.trim().parse::<VCFHeaderLine>()?);
-            } else if line.starts_with('#') {
-                // TODO: check header
-                let elements: Vec<_> = line.trim().split('\t').collect();
-                for one in elements.iter().skip(9) {
-                    header.samples.push(one.to_string());
-                }
-                break;
-            }
-        }
-
-        Ok(VCFReader { reader, header })
-    }
-}
-
-impl<R: io::BufRead> Iterator for VCFReader<R> {
-    type Item = Result<VCFRecord, VCFParseError>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut line = String::new();
-        let result = self.reader.read_line(&mut line);
-        match result {
-            Ok(read_bytes) => {
-                if read_bytes == 0 {
-                    None
-                } else {
-                    match VCFRecord::parse_line(&line, &self.header.samples) {
-                        Ok(record) => Some(Ok(record)),
-                        Err(e) => Some(Err(e)),
-                    }
-                }
-            }
-            Err(e) => Some(Err(VCFParseError::IoError { error: e })),
-        }
-    }
-}
-
 fn encode_vcf_value(value: &str) -> Cow<str> {
     let mut processed_char_num = 0;
     let mut processed_byte_num = 0;
@@ -402,33 +341,6 @@ fn dot_value(value: &[&str], index: usize) -> Option<String> {
         }
     } else {
         None
-    }
-}
-
-pub struct VCFWriter<W: io::Write> {
-    writer: W,
-    header: VCFHeader,
-}
-
-impl<W: io::Write> VCFWriter<W> {
-    pub fn new(mut writer: W, header: VCFHeader) -> io::Result<VCFWriter<W>> {
-        for one in &header.items {
-            writeln!(writer, "{}", one.line)?;
-        }
-        write!(
-            writer,
-            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT"
-        )?;
-        for one in &header.samples {
-            write!(writer, "\t{}", one)?;
-        }
-        writeln!(writer)?;
-
-        Ok(VCFWriter { writer, header })
-    }
-
-    pub fn write_record(&mut self, record: &VCFRecord) -> io::Result<()> {
-        record.write_line(&mut self.writer, &self.header.samples)
     }
 }
 
@@ -645,4 +557,74 @@ fn str_or_dot(value: &Option<String>) -> &str {
 }
 
 #[cfg(test)]
-mod test;
+#[macro_export]
+macro_rules! hash {
+    ( $($v:expr),* ) => {
+        {
+            let mut map = std::collections::HashMap::new();
+            $(
+                map.insert($v.0, $v.1);
+            )*
+            map
+        }
+    }
+}
+
+#[cfg(test)]
+#[macro_export]
+macro_rules! shash {
+    ( $($v:expr),* ) => {
+        {
+            let mut map = std::collections::HashMap::new();
+            $(
+                map.insert($v.0.to_string(), $v.1);
+            )*
+            map
+        }
+    }
+}
+
+#[cfg(test)]
+#[macro_export]
+macro_rules! sihash {
+    ( $($v:expr),* ) => {
+        {
+            let mut map = IndexMap::new();
+            $(
+                map.insert($v.0.to_string(), $v.1);
+            )*
+            map
+        }
+    }
+}
+
+#[cfg(test)]
+#[macro_export]
+macro_rules! sshash {
+    ( $($v:expr),* ) => {
+        {
+            let mut map = std::collections::HashMap::new();
+            $(
+                map.insert($v.0.to_string(), $v.1.to_string());
+            )*
+            map
+        }
+    }
+}
+
+#[cfg(test)]
+#[macro_export]
+macro_rules! svec {
+    ( $( $v:expr ),* ) => {
+        {
+            let mut tmp_vec = Vec::new();
+            $(
+                tmp_vec.push($v.to_string());
+            )*
+            tmp_vec
+        }
+    };
+}
+
+#[cfg(test)]
+pub mod test;
