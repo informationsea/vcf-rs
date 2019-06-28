@@ -3,8 +3,7 @@ extern crate failure;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fmt::{self, Write};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::iter::Iterator;
 use std::str::FromStr;
 
@@ -250,6 +249,7 @@ pub struct VCFHeader {
     pub samples: Vec<String>,
 }
 
+
 #[derive(Debug)]
 pub struct VCFReader<R: io::BufRead> {
     reader: R,
@@ -405,6 +405,33 @@ fn dot_value(value: &[&str], index: usize) -> Option<String> {
     }
 }
 
+pub struct VCFWriter<W: io::Write> {
+    writer: W,
+    header: VCFHeader,
+}
+
+impl<W: io::Write> VCFWriter<W> {
+    pub fn new(mut writer: W, header: VCFHeader) -> io::Result<VCFWriter<W>> {
+        for one in &header.items {
+            writeln!(writer, "{}", one.line)?;
+        }
+        write!(
+            writer,
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT"
+        )?;
+        for one in &header.samples {
+            write!(writer, "\t{}", one)?;
+        }
+        writeln!(writer)?;
+
+        Ok(VCFWriter { writer, header })
+    }
+
+    pub fn write_record(&mut self, record: &VCFRecord) -> io::Result<()> {
+        record.write_line(&mut self.writer, &self.header.samples)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VCFRecord {
     pub chromosome: String,
@@ -506,7 +533,7 @@ impl VCFRecord {
         })
     }
 
-    pub fn write_line<W: Write>(&self, writer: &mut W, samples: &[String]) -> fmt::Result {
+    pub fn write_line<W: io::Write>(&self, writer: &mut W, samples: &[String]) -> io::Result<()> {
         write!(
             writer,
             "{}\t{}\t",
@@ -516,64 +543,64 @@ impl VCFRecord {
         write_str_or_dot(writer, &self.id)?;
         write!(writer, "\t{}\t", self.reference)?;
         write_encoded_vec_or_dot(writer, &self.alternative)?;
-        writer.write_char('\t')?;
+        writer.write_all(b"\t")?;
         write_str_or_dot(writer, &self.quality)?;
-        writer.write_char('\t')?;
+        writer.write_all(b"\t")?;
         write_encoded_vec_or_dot(writer, &self.filter)?;
 
-        writer.write_char('\t')?;
+        writer.write_all(b"\t")?;
         if self.info.is_empty() {
-            writer.write_char('.')?;
+            writer.write_all(b".")?;
         } else {
             for (i, (k, v)) in self.info.iter().enumerate() {
                 if i != 0 {
-                    writer.write_char(';')?;
+                    writer.write_all(b";")?;
                 }
-                writer.write_str(k)?;
+                writer.write_all(k.as_bytes())?;
                 if v.is_empty() {
                     // skip
                 } else {
-                    writer.write_char('=')?;
+                    writer.write_all(b"=")?;
                     write_encoded_vec_or_dot(writer, &v)?;
                 }
             }
         }
 
         if !samples.is_empty() {
-            writer.write_char('\t')?;
+            writer.write_all(b"\t")?;
             if self.format.is_empty() {
-                writer.write_char('.')?;
+                writer.write_all(b".")?;
             } else {
                 for (i, one) in self.format.iter().enumerate() {
                     if i != 0 {
-                        writer.write_char(':')?;
+                        writer.write_all(b":")?;
                     }
-                    writer.write_str(&encode_vcf_value(&one))?;
+                    writer.write_all(encode_vcf_value(&one).as_bytes())?;
                 }
             }
-            writer.write_char('\t')?;
+            writer.write_all(b"\t")?;
             for (si, one_sample) in samples.iter().enumerate() {
                 if si != 0 {
-                    writer.write_char('\t')?;
+                    writer.write_all(b"\t")?;
                 }
                 if let Some(call_result) = self.call.get(one_sample) {
                     for (i, one_format) in self.format.iter().enumerate() {
                         if i != 0 {
-                            writer.write_char(':')?;
+                            writer.write_all(b":")?;
                         }
                         if let Some(one_call) = call_result.get(one_format) {
                             write_encoded_vec_or_dot(writer, one_call)?;
                         } else {
-                            writer.write_char('.')?;
+                            writer.write_all(b".")?;
                         }
                     }
                 } else {
-                    writer.write_char('.')?;
+                    writer.write_all(b".")?;
                 }
             }
         }
 
-        writer.write_char('\n')?;
+        writer.write_all(b"\n")?;
 
         Ok(())
     }
@@ -586,7 +613,7 @@ fn encode_str_or_dot(value: &Option<String>) -> Cow<str> {
         .unwrap_or(Cow::Borrowed("."))
 }
 
-fn write_str_or_dot<W: Write>(writer: &mut W, value: &Option<String>) -> fmt::Result {
+fn write_str_or_dot<W: io::Write>(writer: &mut W, value: &Option<String>) -> io::Result<()> {
     write!(
         writer,
         "{}",
@@ -598,13 +625,13 @@ fn write_str_or_dot<W: Write>(writer: &mut W, value: &Option<String>) -> fmt::Re
     Ok(())
 }
 
-fn write_encoded_vec_or_dot<W: Write>(writer: &mut W, value: &[String]) -> fmt::Result {
+fn write_encoded_vec_or_dot<W: Write>(writer: &mut W, value: &[String]) -> io::Result<()> {
     if value.is_empty() {
-        writer.write_str(".")?;
+        writer.write_all(b".")?;
     } else {
         for (i, v) in value.iter().enumerate() {
             if i != 0 {
-                writer.write_str(",")?;
+                writer.write_all(b",")?;
             }
             write!(writer, "{}", encode_vcf_value(v))?;
         }

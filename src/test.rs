@@ -1,6 +1,7 @@
 use super::*;
 use flate2::read::MultiGzDecoder;
 use std::fs::File;
+use std::io::prelude::*;
 
 #[macro_export]
 macro_rules! hash {
@@ -949,9 +950,9 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
 
 #[allow(clippy::unreadable_literal)]
 #[test]
-fn test_write_line() -> fmt::Result {
+fn test_write_line() -> io::Result<()> {
     {
-        let mut line = String::new();
+        let mut line = Vec::new();
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
@@ -966,11 +967,14 @@ fn test_write_line() -> fmt::Result {
         }
         .write_line(&mut line, &[])?;
 
-        assert_eq!("19\t11472995\thoge\tA\tC,AC\t.\t.\t.\n", line);
+        assert_eq!(
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\n"[..],
+            &line as &[u8]
+        );
     }
 
     {
-        let mut line = String::new();
+        let mut line = Vec::new();
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
@@ -985,11 +989,14 @@ fn test_write_line() -> fmt::Result {
         }
         .write_line(&mut line, &svec!["foo"])?;
 
-        assert_eq!("19\t11472995\thoge\tA\tC,AC\t.\t.\t.\t.\t.\n", line);
+        assert_eq!(
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\t.\t.\n"[..],
+            &line as &[u8]
+        );
     }
 
     {
-        let mut line = String::new();
+        let mut line = Vec::new();
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
@@ -1012,13 +1019,13 @@ fn test_write_line() -> fmt::Result {
         .write_line(&mut line, &svec!["foo"])?;
 
         assert_eq!(
-            "19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\n",
-            line
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\n"[..],
+            &line as &[u8]
         );
     }
 
     {
-        let mut line = String::new();
+        let mut line = Vec::new();
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
@@ -1041,13 +1048,13 @@ fn test_write_line() -> fmt::Result {
         .write_line(&mut line, &svec!["foo", "bar"])?;
 
         assert_eq!(
-            "19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t.\n",
-            line
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t.\n"[..],
+            &line as &[u8]
         );
     }
 
     {
-        let mut line = String::new();
+        let mut line = Vec::new();
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
@@ -1073,10 +1080,29 @@ fn test_write_line() -> fmt::Result {
         .write_line(&mut line, &svec!["foo", "bar"])?;
 
         assert_eq!(
-            "19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t0/1:.\n",
-            line
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t0/1:.\n"[..],
+            &line as &[u8]
         );
     }
 
     Ok(())
+}
+
+#[test]
+fn test_writer() {
+    let mut vcf_reader = VCFReader::new(MultiGzDecoder::new(
+        File::open("testfiles/ALL.chr20.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.20-34001094-34168504-subset.vcf.gz")
+            .unwrap()
+    )).unwrap();
+
+    let records: Vec<_> = (&vcf_reader).collect();
+
+    let mut raw_data = Vec::new();
+    MultiGzDecoder::new(
+        File::open("testfiles/ALL.chr20.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.20-34001094-34168504-subset.vcf.gz")
+            .unwrap()
+    ).read_to_end(&mut raw_data).unwrap();
+
+    let mut write_buf: Vec<u8> = Vec::new();
+    let mut writer = VCFWriter::new(&mut write_buf, vcf_reader.header().clone());
 }
