@@ -1,10 +1,10 @@
 use super::*;
 use crate::{shash, sihash, svec, Number, VCFHeaderContent, ValueType};
 
-use indexmap::IndexMap;
-use std::collections::HashMap;
-use std::fs::File;
 use flate2::read::MultiGzDecoder;
+use indexmap::IndexMap;
+use std::fs::File;
+use std::collections::HashMap;
 
 #[allow(clippy::unreadable_literal)]
 #[test]
@@ -421,7 +421,7 @@ fn test_read_vcf2() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "20".to_string(),
             position: 34001111,
-            id: Some("rs565014200".to_string()),
+            id: svec!["rs565014200"],
             reference: "T".to_string(),
             alternative: svec!["C"],
             quality: Some("100".to_string()),
@@ -460,7 +460,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -510,7 +510,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -551,7 +551,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -582,7 +582,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -619,7 +619,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -641,7 +641,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -663,7 +663,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -685,7 +685,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: Some("20".to_string()),
@@ -707,7 +707,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: None,
+            id: Vec::new(),
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -729,7 +729,7 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
         VCFRecord {
             chromosome: "19".to_string(),
             position: 11472995,
-            id: Some("hoge".to_string()),
+            id: svec!["hoge".to_string()],
             reference: "A".to_string(),
             alternative: svec!["C", "AC"],
             quality: None,
@@ -741,146 +741,6 @@ fn test_parse_vcf_record() -> Result<(), VCFParseError> {
     );
 
     assert!(VCFRecord::parse_line("19\t11472995\thoge\tA", &[]).is_err());
-
-    Ok(())
-}
-
-#[allow(clippy::unreadable_literal)]
-#[test]
-fn test_write_line() -> io::Result<()> {
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Some("hoge".to_string()),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new(),
-        }
-        .write_line(&mut line, &[])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Some("hoge".to_string()),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new(),
-        }
-        .write_line(&mut line, &svec!["foo"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\t.\t.\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Some("hoge".to_string()),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: sihash![
-                ("HOGE", Vec::<String>::new()),
-                ("FOO", svec!["TEST"]),
-                ("BAR", svec!["TEST1", "TEST2"])
-            ],
-            format: svec!["GT", "AD"],
-            call: shash![(
-                "foo",
-                shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
-            )],
-        }
-        .write_line(&mut line, &svec!["foo"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Some("hoge".to_string()),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: sihash![
-                ("HOGE", Vec::<String>::new()),
-                ("FOO", svec!["TEST"]),
-                ("BAR", svec!["TEST1", "TEST2"])
-            ],
-            format: svec!["GT", "AD"],
-            call: shash![(
-                "foo",
-                shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
-            )],
-        }
-        .write_line(&mut line, &svec!["foo", "bar"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t.\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Some("hoge".to_string()),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: sihash![
-                ("HOGE", Vec::<String>::new()),
-                ("FOO", svec!["TEST"]),
-                ("BAR", svec!["TEST1", "TEST2"])
-            ],
-            format: svec!["GT", "AD"],
-            call: shash![
-                (
-                    "foo",
-                    shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
-                ),
-                ("bar", shash![("GT", svec!["0/1"])])
-            ],
-        }
-        .write_line(&mut line, &svec!["foo", "bar"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t0/1:.\n"[..],
-            &line as &[u8]
-        );
-    }
 
     Ok(())
 }

@@ -1,8 +1,9 @@
 use super::*;
 use crate::reader::VCFReader;
-use std::fs::File;
+
 use flate2::read::MultiGzDecoder;
-use std::io::prelude::*;
+use std::fs::File;
+use std::io::{Read, Write};
 
 #[test]
 fn test_writer() {
@@ -20,5 +21,13 @@ fn test_writer() {
     ).read_to_end(&mut raw_data).unwrap();
 
     let mut write_buf: Vec<u8> = Vec::new();
-    let mut writer = VCFWriter::new(&mut write_buf, vcf_reader.header().clone());
+    let mut writer = VCFWriter::new(&mut write_buf, vcf_reader.header().clone()).unwrap();
+    for one in &records {
+        writer.write_record(one.as_ref().unwrap()).unwrap();
+    }
+
+    let mut text_writer = File::create("target/test-vcf-output.vcf").unwrap();
+    text_writer.write_all(&write_buf).unwrap();
+
+    assert_eq!(raw_data, write_buf);
 }

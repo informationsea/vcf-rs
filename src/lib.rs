@@ -348,7 +348,7 @@ fn dot_value(value: &[&str], index: usize) -> Option<String> {
 pub struct VCFRecord {
     pub chromosome: String,
     pub position: u64,
-    pub id: Option<String>,
+    pub id: Vec<String>,
     pub reference: String,
     pub alternative: Vec<String>,
     pub quality: Option<String>,
@@ -424,7 +424,14 @@ impl VCFRecord {
             position: elements[1]
                 .parse::<u64>()
                 .map_err(|_| VCFParseError::PositionIsNotNumber(elements[1].to_string()))?,
-            id: dot_value(&elements, 2),
+            id: if elements[2] == "." {
+                Vec::new()
+            } else {
+                elements[2]
+                    .split(';')
+                    .map(|x| decode_vcf_value(x))
+                    .collect()
+            },
             reference: decode_vcf_value(elements[3]),
             alternative: elements[4]
                 .split(',')
@@ -452,7 +459,16 @@ impl VCFRecord {
             encode_vcf_value(&self.chromosome),
             self.position,
         )?;
-        write_str_or_dot(writer, &self.id)?;
+        if self.id.is_empty() {
+            writer.write_all(b".")?;
+        } else {
+            for (i, one) in self.id.iter().enumerate() {
+                if i != 0 {
+                    writer.write_all(b";")?;
+                }
+                writer.write_all(encode_vcf_value(one).as_bytes())?;
+            }
+        }
         write!(writer, "\t{}\t", self.reference)?;
         write_encoded_vec_or_dot(writer, &self.alternative)?;
         writer.write_all(b"\t")?;

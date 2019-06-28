@@ -141,3 +141,143 @@ fn test_header_line_from_str() {
     );
 }
 
+#[allow(clippy::unreadable_literal)]
+#[test]
+fn test_write_line() -> io::Result<()> {
+    {
+        let mut line = Vec::new();
+        VCFRecord {
+            chromosome: "19".to_string(),
+            position: 11472995,
+            id: svec!["hoge".to_string()],
+            reference: "A".to_string(),
+            alternative: svec!["C", "AC"],
+            quality: None,
+            filter: Vec::new(),
+            info: IndexMap::new(),
+            format: Vec::new(),
+            call: HashMap::new(),
+        }
+        .write_line(&mut line, &[])?;
+
+        assert_eq!(
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\n"[..],
+            &line as &[u8]
+        );
+    }
+
+    {
+        let mut line = Vec::new();
+        VCFRecord {
+            chromosome: "19".to_string(),
+            position: 11472995,
+            id: svec!["hoge".to_string()],
+            reference: "A".to_string(),
+            alternative: svec!["C", "AC"],
+            quality: None,
+            filter: Vec::new(),
+            info: IndexMap::new(),
+            format: Vec::new(),
+            call: HashMap::new(),
+        }
+        .write_line(&mut line, &svec!["foo"])?;
+
+        assert_eq!(
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\t.\t.\n"[..],
+            &line as &[u8]
+        );
+    }
+
+    {
+        let mut line = Vec::new();
+        VCFRecord {
+            chromosome: "19".to_string(),
+            position: 11472995,
+            id: svec!["hoge".to_string()],
+            reference: "A".to_string(),
+            alternative: svec!["C", "AC"],
+            quality: None,
+            filter: Vec::new(),
+            info: sihash![
+                ("HOGE", Vec::<String>::new()),
+                ("FOO", svec!["TEST"]),
+                ("BAR", svec!["TEST1", "TEST2"])
+            ],
+            format: svec!["GT", "AD"],
+            call: shash![(
+                "foo",
+                shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
+            )],
+        }
+        .write_line(&mut line, &svec!["foo"])?;
+
+        assert_eq!(
+            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\n"[..],
+            &line as &[u8]
+        );
+    }
+
+    {
+        let mut line = Vec::new();
+        VCFRecord {
+            chromosome: "19".to_string(),
+            position: 11472995,
+            id: svec!["hoge", "foo", "bar"],
+            reference: "A".to_string(),
+            alternative: svec!["C", "AC"],
+            quality: None,
+            filter: Vec::new(),
+            info: sihash![
+                ("HOGE", Vec::<String>::new()),
+                ("FOO", svec!["TEST"]),
+                ("BAR", svec!["TEST1", "TEST2"])
+            ],
+            format: svec!["GT", "AD"],
+            call: shash![(
+                "foo",
+                shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
+            )],
+        }
+        .write_line(&mut line, &svec!["foo", "bar"])?;
+
+        assert_eq!(
+            &b"19\t11472995\thoge;foo;bar\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t.\n"[..],
+            &line as &[u8]
+        );
+    }
+
+    {
+        let mut line = Vec::new();
+        VCFRecord {
+            chromosome: "19".to_string(),
+            position: 11472995,
+            id: svec!["hoge", "foo"],
+            reference: "A".to_string(),
+            alternative: svec!["C", "AC"],
+            quality: None,
+            filter: Vec::new(),
+            info: sihash![
+                ("HOGE", Vec::<String>::new()),
+                ("FOO", svec!["TEST"]),
+                ("BAR", svec!["TEST1", "TEST2"])
+            ],
+            format: svec!["GT", "AD"],
+            call: shash![
+                (
+                    "foo",
+                    shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
+                ),
+                ("bar", shash![("GT", svec!["0/1"])])
+            ],
+        }
+        .write_line(&mut line, &svec!["foo", "bar"])?;
+
+        assert_eq!(
+            &b"19\t11472995\thoge;foo\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t0/1:.\n"[..],
+            &line as &[u8]
+        );
+    }
+
+    Ok(())
+}
+

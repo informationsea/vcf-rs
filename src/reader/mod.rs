@@ -8,12 +8,6 @@ pub struct VCFReader<R: BufRead> {
     header: VCFHeader,
 }
 
-impl<R: BufRead> VCFReader<R> {
-    pub fn header(&self) -> &VCFHeader {
-        &self.header
-    }
-}
-
 impl<R: Read> VCFReader<io::BufReader<R>> {
     pub fn new(read: R) -> Result<Self, VCFParseError> {
         let mut reader = io::BufReader::new(read);
@@ -50,6 +44,10 @@ impl<R: Read> VCFReader<io::BufReader<R>> {
 }
 
 impl<R: BufRead> VCFReader<R> {
+    pub fn header(&self) -> &VCFHeader {
+        &self.header
+    }
+
     pub fn next_item(&mut self) -> Option<Result<VCFRecord, VCFParseError>> {
         let mut line = String::new();
         let result = self.reader.read_line(&mut line);
