@@ -451,3 +451,31 @@ fn test_read_vcf2() -> Result<(), VCFParseError> {
     Ok(())
 }
 
+#[test]
+fn test_bad_vcf1() -> Result<(), VCFParseError> {
+    let bad_vcf = include_bytes!("../../testfiles/bad-vcf1.vcf");
+    let mut vcf_reader = VCFReader::new(&bad_vcf[..])?;
+    let bad_record = vcf_reader.next_item();
+    match bad_record {
+        Some(Err(VCFParseError::NotEnoughColumnsWithLine { line })) => assert_eq!(line, 3),
+        _ => unreachable!(),
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_bad_vcf2() -> Result<(), VCFParseError> {
+    let bad_vcf = include_bytes!("../../testfiles/bad-vcf2.vcf");
+    let mut vcf_reader = VCFReader::new(&bad_vcf[..])?;
+    let bad_record = vcf_reader.next_item();
+    match bad_record {
+        Some(Err(VCFParseError::PositionIsNotNumberWithLine { s, line })) => {
+            assert_eq!(line, 3);
+            assert_eq!(s, "x");
+        }
+        _ => unreachable!(),
+    }
+
+    Ok(())
+}

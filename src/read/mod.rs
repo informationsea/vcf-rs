@@ -42,10 +42,12 @@ use std::io::prelude::*;
 pub struct VCFReader<R: BufRead> {
     reader: R,
     header: VCFHeader,
+    current_line: u64,
 }
 
 impl<R: Read> VCFReader<io::BufReader<R>> {
     pub fn new(read: R) -> Result<Self, VCFParseError> {
+        let mut current_line = 0;
         let mut reader = io::BufReader::new(read);
         let mut header = VCFHeader {
             items: Vec::new(),
@@ -54,6 +56,7 @@ impl<R: Read> VCFReader<io::BufReader<R>> {
 
         let mut line = String::new();
         loop {
+            current_line += 1;
             line.clear();
             let read_bytes = reader
                 .read_line(&mut line)
@@ -74,7 +77,11 @@ impl<R: Read> VCFReader<io::BufReader<R>> {
             }
         }
 
-        Ok(VCFReader { reader, header })
+        Ok(VCFReader {
+            reader,
+            header,
+            current_line,
+        })
     }
 }
 
@@ -84,6 +91,7 @@ impl<R: BufRead> VCFReader<R> {
     }
 
     pub fn next_item(&mut self) -> Option<Result<VCFRecord, VCFParseError>> {
+        self.current_line += 1;
         let mut line = String::new();
         let result = self.reader.read_line(&mut line);
         match result {
@@ -93,7 +101,10 @@ impl<R: BufRead> VCFReader<R> {
                 } else {
                     match VCFRecord::parse_line(&line, &self.header.samples) {
                         Ok(record) => Some(Ok(record)),
-                        Err(e) => Some(Err(e)),
+                        Err(VCFParseError::Other(m)) => Some(Err(VCFParseError::OtherWithLine{message: m, line: self.current_line})),
+                        Err(VCFParseError::PositionIsNotNumber(m)) => Some(Err(VCFParseError::PositionIsNotNumberWithLine{s: m, line: self.current_line})),
+                        Err(VCFParseError::NotEnoughColumns) => Some(Err(VCFParseError::NotEnoughColumnsWithLine{line: self.current_line})),
+                        Err(e) => Some(Err(e))
                     }
                 }
             }

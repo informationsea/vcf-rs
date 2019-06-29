@@ -56,9 +56,9 @@ use indexmap::IndexMap;
 
 pub use header::{Number, VCFHeader, VCFHeaderContent, VCFHeaderLine, ValueType};
 pub use read::VCFReader;
-pub use write::VCFWriter;
-pub use record::VCFRecord;
 
+pub use record::VCFRecord;
+pub use write::VCFWriter;
 /// Error returned when something wrong in a vcf format.
 #[derive(Fail, Debug)]
 pub enum VCFParseError {
@@ -70,6 +70,12 @@ pub enum VCFParseError {
     PositionIsNotNumber(String),
     #[fail(display = "Too small number of columns")]
     NotEnoughColumns,
+    #[fail(display = "Error: {} at line {}", message, line)]
+    OtherWithLine { message: &'static str, line: u64 },
+    #[fail(display = "Position is not number: {} at line {}", s, line)]
+    PositionIsNotNumberWithLine { s: String, line: u64 },
+    #[fail(display = "Too small number of columns at line {}", line)]
+    NotEnoughColumnsWithLine { line: u64 },
 }
 
 impl From<io::Error> for VCFParseError {
