@@ -3,7 +3,17 @@ name = "vcf"
 version = "0.1.0"
 authors = ["OKAMURA, Yasunobu <okamura@informationsea.info>"]
 edition = "2018"
-license = "Apache 2.0"
+license = "Apache-2.0"
+description = "Torelant VCF Parser"
+homepage = "https://github.com/informationsea/vcf-rs"
+repository = "https://github.com/informationsea/vcf-rs"
+keywords = ["VCF", "bioinformatics", "parser"]
+categories = ["parser-implementations", "science"]
+
+[badges]
+appveyor = { repository = "informationsea/vcf-rs", branch = "master", service = "github" }
+travis-ci = { repository = "informationsea/vcf-rs", branch = "master" }
+maintenance = { status = "experimental" }
 
 [dependencies]
 failure = "0.1"

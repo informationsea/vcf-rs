@@ -2,6 +2,42 @@ use super::{VCFHeader, VCFHeaderLine, VCFParseError, VCFRecord};
 
 use std::io;
 use std::io::prelude::*;
+
+/// Read a VCF file from plain text.
+///
+/// If you want to read a compressed VCF file, please use `flate2::read::MultiGzDecoder` in [flate2](https://crates.io/crates/flate2) crate to uncompress. Do not use `flate2::read::GzDecoder` because most of compressed VCF files are composed of multi gzip blocks.
+/// # Example
+///
+/// ```
+/// use vcf::*;
+/// use flate2::read::MultiGzDecoder;
+/// use std::fs::File;
+///
+/// # fn main() { let _ = run(); }
+/// # fn run() -> Result<(), VCFParseError> {
+/// let mut vcf_reader = VCFReader::new(MultiGzDecoder::new(
+///     File::open("testfiles/ALL.chr20.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.20-34001094-34168504-subset.vcf.gz")?
+/// ))?;
+/// assert_eq!(vcf_reader.header().items.len(), 255);
+/// assert_eq!(vcf_reader.header().items[0],
+///     VCFHeaderLine{
+///         line: "##fileformat=VCFv4.1".to_string(),
+///         contents: VCFHeaderContent::FileFormat("VCFv4.1".to_string())
+///     });
+/// assert_eq!(
+///     vcf_reader.header().samples,
+///     vec!["HG00096", "HG00097", "HG00099"]
+/// );
+///
+/// // read records
+/// for one in vcf_reader {
+///    let record = one?;
+///    // process a record
+/// }
+/// #   Ok(())
+/// # }
+/// ```
+///
 #[derive(Debug)]
 pub struct VCFReader<R: BufRead> {
     reader: R,
@@ -40,7 +76,6 @@ impl<R: Read> VCFReader<io::BufReader<R>> {
 
         Ok(VCFReader { reader, header })
     }
-
 }
 
 impl<R: BufRead> VCFReader<R> {

@@ -1,3 +1,43 @@
+//! Rust implementation of vcf parser/writer without strict validation.
+//!
+//! # Example
+//!
+//! ```
+//! use vcf::*;
+//! use flate2::read::MultiGzDecoder;
+//! use std::fs::File;
+//!
+//! # fn main() { let _ = run(); }
+//! # fn run() -> Result<(), VCFParseError> {
+//! let mut vcf_reader = VCFReader::new(MultiGzDecoder::new(
+//!     File::open("testfiles/ALL.chr20.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.20-34001094-34168504-subset.vcf.gz")
+//!         .map_err(|e| VCFParseError::IoError{error:e})?
+//! ))?;
+//! assert_eq!(vcf_reader.header().items.len(), 255);
+//! assert_eq!(vcf_reader.header().items[0],
+//!     VCFHeaderLine{
+//!         line: "##fileformat=VCFv4.1".to_string(),
+//!         contents: VCFHeaderContent::FileFormat("VCFv4.1".to_string())
+//!     });
+//! assert_eq!(
+//!     vcf_reader.header().samples,
+//!     vec!["HG00096", "HG00097", "HG00099"]
+//! );
+//!
+//! // load next record
+//! let record = vcf_reader.iter().next().unwrap()?;
+//! assert_eq!(record.chromosome, "20");
+//! assert_eq!(record.position, 34001111);
+//! assert_eq!(record.id, vec!["rs565014200"]);
+//! assert_eq!(record.reference, "T");
+//! assert_eq!(record.alternative, vec!["C"]);
+//! assert_eq!(record.quality, Some("100".to_string()));
+//! assert_eq!(record.info["AN"], vec!["6"]); // vcf-rs does not validate a number of entries and type
+//! assert_eq!(record.call["HG00096"]["GT"], vec!["0|0"]);
+//! #   Ok(())
+//! # }
+//! ```
+
 #[macro_use]
 extern crate failure;
 
@@ -15,6 +55,7 @@ use indexmap::IndexMap;
 pub use reader::VCFReader;
 pub use writer::VCFWriter;
 
+/// Error returned when something wrong in a vcf format.
 #[derive(Fail, Debug)]
 pub enum VCFParseError {
     #[fail(display = "IO error: {}", error)]
@@ -27,6 +68,13 @@ pub enum VCFParseError {
     NotEnoughColumns,
 }
 
+impl From<io::Error> for VCFParseError {
+    fn from(e: io::Error) -> Self {
+        VCFParseError::IoError { error: e }
+    }
+}
+
+/// A number of entries of INFO or FORMAT.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Number {
     Reference,
@@ -38,6 +86,7 @@ pub enum Number {
     Other(String),
 }
 
+/// An entry value type of INFO or FORMAT.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValueType {
     String,
@@ -48,6 +97,7 @@ pub enum ValueType {
     Other(String),
 }
 
+/// A content of header line.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VCFHeaderContent {
     INFO {
@@ -157,10 +207,17 @@ fn vcf_header_parse_helper<'a>(info: &'a str) -> HashMap<&'a str, &'a str> {
     result
 }
 
+/// A header line.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VCFHeaderLine {
     pub line: String,
     pub contents: VCFHeaderContent,
+}
+
+impl VCFHeaderLine {
+    pub fn new(s: &str) -> Result<Self, VCFParseError> {
+        s.parse::<VCFHeaderLine>()
+    }
 }
 
 impl FromStr for VCFHeaderLine {
@@ -249,12 +306,12 @@ impl FromStr for VCFHeaderLine {
     }
 }
 
+/// VCF header struct.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VCFHeader {
     pub items: Vec<VCFHeaderLine>,
     pub samples: Vec<String>,
 }
-
 
 fn encode_vcf_value(value: &str) -> Cow<str> {
     let mut processed_char_num = 0;
@@ -344,6 +401,7 @@ fn dot_value(value: &[&str], index: usize) -> Option<String> {
     }
 }
 
+/// A VCF record structure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VCFRecord {
     pub chromosome: String,
@@ -359,6 +417,7 @@ pub struct VCFRecord {
 }
 
 impl VCFRecord {
+    /// Create VCFRecord from a text line.    
     pub fn parse_line(line: &str, samples: &[String]) -> Result<VCFRecord, VCFParseError> {
         let elements: Vec<_> = line.trim().split('\t').collect();
 
@@ -452,6 +511,7 @@ impl VCFRecord {
         })
     }
 
+    /// write a VCF line.
     pub fn write_line<W: io::Write>(&self, writer: &mut W, samples: &[String]) -> io::Result<()> {
         write!(
             writer,
