@@ -9,6 +9,7 @@ homepage = "https://github.com/informationsea/vcf-rs"
 repository = "https://github.com/informationsea/vcf-rs"
 keywords = ["VCF", "bioinformatics", "parser"]
 categories = ["parser-implementations", "science"]
+exclude = ["testfiles/*"]
 
 [badges]
 appveyor = { repository = "informationsea/vcf-rs", branch = "master", service = "github" }
