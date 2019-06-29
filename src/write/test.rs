@@ -1,5 +1,4 @@
 use super::*;
-use crate::reader::VCFReader;
 use flate2::read::MultiGzDecoder;
 
 use crate::*;

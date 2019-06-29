@@ -41,8 +41,8 @@
 #[macro_use]
 extern crate failure;
 
-mod reader;
-mod writer;
+mod read;
+mod write;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -52,8 +52,8 @@ use std::str::FromStr;
 
 use indexmap::IndexMap;
 
-pub use reader::VCFReader;
-pub use writer::VCFWriter;
+pub use read::VCFReader;
+pub use write::VCFWriter;
 
 /// Error returned when something wrong in a vcf format.
 #[derive(Fail, Debug)]
