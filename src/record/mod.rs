@@ -1,194 +1,179 @@
-use super::*;
+mod parser;
 
-/// A VCF record structure.
-#[derive(Debug, Clone, PartialEq, Eq)]
+use crate::U8Vec;
+use crate::VCFHeader;
+pub use parser::parse_record;
+use std::collections::HashMap;
+use std::io::{self, Write};
+use std::rc::Rc;
+use std::usize;
+
+pub const NOT_FOUND: usize = usize::MAX;
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct VCFRecord {
-    pub chromosome: String,
+    header: Rc<VCFHeader>,
+    pub chromosome: U8Vec,
     pub position: u64,
-    pub id: Vec<String>,
-    pub reference: String,
-    pub alternative: Vec<String>,
-    pub quality: Option<String>,
-    pub filter: Vec<String>,
-    pub info: IndexMap<String, Vec<String>>,
-    pub format: Vec<String>,
-    pub call: HashMap<String, HashMap<String, Vec<String>>>,
+    pub id: Vec<U8Vec>,
+    pub reference: U8Vec,
+    pub alternative: Vec<U8Vec>,
+    pub qual: Option<f64>,
+    pub filter: Vec<U8Vec>,
+    pub info: Vec<(U8Vec, Vec<U8Vec>)>,
+    info_index: HashMap<U8Vec, usize>,
+    pub format: Vec<U8Vec>,
+    format_index: HashMap<U8Vec, usize>,
+    pub genotype: Vec<Vec<Vec<U8Vec>>>,
 }
 
 impl VCFRecord {
-    /// Create VCFRecord from a text line.    
-    pub fn parse_line(line: &str, samples: &[String]) -> Result<VCFRecord, VCFParseError> {
-        let elements: Vec<_> = line.trim().split('\t').collect();
-
-        if elements.len() < 5 {
-            return Err(VCFParseError::NotEnoughColumns);
+    pub fn new(header: Rc<VCFHeader>) -> Self {
+        VCFRecord {
+            header,
+            chromosome: vec![],
+            position: 0,
+            id: vec![],
+            reference: vec![],
+            alternative: vec![],
+            qual: None,
+            filter: vec![],
+            info: vec![],
+            info_index: HashMap::new(),
+            format: vec![],
+            format_index: HashMap::new(),
+            genotype: vec![],
         }
-
-        let info = if elements.len() < 8 || elements[7] == "." {
-            IndexMap::new()
-        } else {
-            elements[7]
-                .split(';')
-                .map(|x| {
-                    let mut y = x.splitn(2, '=');
-                    let first = y.next().unwrap();
-                    let second = y.next();
-                    (
-                        first.to_string(),
-                        second
-                            .map(|x| {
-                                x.split(',')
-                                    .map(|z| decode_vcf_value(z))
-                                    .collect::<Vec<_>>()
-                            })
-                            .unwrap_or_else(|| vec![]),
-                    )
-                })
-                .collect()
-        };
-
-        let format = if elements.len() < 9 || elements[8] == "." {
-            vec![]
-        } else {
-            elements[8]
-                .split(':')
-                .map(|x| decode_vcf_value(x))
-                .collect()
-        };
-
-        let call = elements
-            .iter()
-            .skip(9)
-            .zip(samples)
-            .map(|(v, k)| {
-                (
-                    k.to_string(),
-                    v.split(':')
-                        .zip(format.iter())
-                        .filter(|(x, _)| *x != ".")
-                        .map(|(x, f)| {
-                            (
-                                f.to_string(),
-                                x.split(',').map(|z| decode_vcf_value(z)).collect(),
-                            )
-                        })
-                        .collect(),
-                )
-            })
-            .collect();
-
-        Ok(VCFRecord {
-            chromosome: decode_vcf_value(elements[0]),
-            position: elements[1]
-                .parse::<u64>()
-                .map_err(|_| VCFParseError::PositionIsNotNumber(elements[1].to_string()))?,
-            id: if elements[2] == "." {
-                Vec::new()
-            } else {
-                elements[2]
-                    .split(';')
-                    .map(|x| decode_vcf_value(x))
-                    .collect()
-            },
-            reference: decode_vcf_value(elements[3]),
-            alternative: elements[4]
-                .split(',')
-                .map(|x| decode_vcf_value(x))
-                .collect(),
-            quality: dot_value(&elements, 5),
-            filter: if elements.len() < 7 || elements[6] == "." {
-                vec![]
-            } else {
-                elements[6]
-                    .split(',')
-                    .map(|x| decode_vcf_value(x))
-                    .collect()
-            },
-            info,
-            format,
-            call,
-        })
     }
 
-    /// write a VCF line.
-    pub fn write_line<W: io::Write>(&self, writer: &mut W, samples: &[String]) -> io::Result<()> {
-        write!(
-            writer,
-            "{}\t{}\t",
-            encode_vcf_value(&self.chromosome),
-            self.position,
-        )?;
-        if self.id.is_empty() {
-            writer.write_all(b".")?;
-        } else {
-            for (i, one) in self.id.iter().enumerate() {
-                if i != 0 {
-                    writer.write_all(b";")?;
-                }
-                writer.write_all(encode_vcf_value(one).as_bytes())?;
-            }
-        }
-        write!(writer, "\t{}\t", self.reference)?;
-        write_encoded_vec_or_dot(writer, &self.alternative)?;
-        writer.write_all(b"\t")?;
-        write_str_or_dot(writer, &self.quality)?;
-        writer.write_all(b"\t")?;
-        write_encoded_vec_or_dot(writer, &self.filter)?;
+    pub fn header(&self) -> &VCFHeader {
+        &self.header
+    }
 
-        writer.write_all(b"\t")?;
-        if self.info.is_empty() {
-            writer.write_all(b".")?;
-        } else {
-            for (i, (k, v)) in self.info.iter().enumerate() {
-                if i != 0 {
-                    writer.write_all(b";")?;
-                }
-                writer.write_all(k.as_bytes())?;
-                if v.is_empty() {
-                    // skip
-                } else {
-                    writer.write_all(b"=")?;
-                    write_encoded_vec_or_dot(writer, &v)?;
-                }
-            }
-        }
+    pub fn info(&self, key: &[u8]) -> Option<&Vec<U8Vec>> {
+        self.info_index.get(key).map(|x| &self.info[*x].1)
+    }
 
-        if !samples.is_empty() {
-            writer.write_all(b"\t")?;
-            if self.format.is_empty() {
-                writer.write_all(b".")?;
+    pub fn genotype(&self, sample_name: &[u8], key: &[u8]) -> Option<&Vec<U8Vec>> {
+        self.header
+            .sample_index(sample_name)
+            .map(|x| {
+                self.format_index
+                    .get(key)
+                    .map(|y| self.genotype.get(x).map(|z| z.get(*y)))
+            })
+            .flatten()
+            .flatten()
+            .flatten()
+    }
+
+    /// Recreate info and genotype index cache.
+    /// Please call this method if you modify info and format field manually.
+    pub fn recreate_info_and_genotype_index(&mut self) {
+        // create info_index
+        for v in self.info_index.values_mut() {
+            *v = crate::NOT_FOUND;
+        }
+        for (i, k) in self.info.iter().enumerate() {
+            if let Some(x) = self.info_index.get_mut(&k.0) {
+                *x = i;
             } else {
-                for (i, one) in self.format.iter().enumerate() {
+                self.info_index.insert(k.0.to_vec(), i);
+            }
+        }
+
+        // create format_index
+        for v in self.format_index.values_mut() {
+            *v = crate::NOT_FOUND;
+        }
+        for (i, k) in self.format.iter().enumerate() {
+            if let Some(x) = self.format_index.get_mut(k) {
+                *x = i;
+            } else {
+                self.format_index.insert(k.to_vec(), i);
+            }
+        }
+    }
+}
+
+fn write_array(writer: &mut impl Write, array: &[Vec<u8>], delimiter: &[u8]) -> io::Result<()> {
+    if array.is_empty() {
+        writer.write_all(b".")?;
+    } else {
+        for (i, one) in array.iter().enumerate() {
+            if i != 0 {
+                writer.write_all(delimiter)?;
+            }
+            writer.write_all(one)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn write_info(writer: &mut impl Write, info: &[(U8Vec, Vec<U8Vec>)]) -> io::Result<()> {
+    if info.is_empty() {
+        writer.write_all(b".")?;
+    } else {
+        for (i, (k, v)) in info.iter().enumerate() {
+            if i != 0 {
+                writer.write_all(b";")?;
+            }
+            writer.write_all(k)?;
+            if !v.is_empty() {
+                writer.write_all(b"=")?;
+                for (j, x) in v.iter().enumerate() {
+                    if j != 0 {
+                        writer.write_all(b",")?;
+                    }
+                    writer.write_all(x)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+impl VCFRecord {
+    pub fn write_record<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        writer.write_all(&self.chromosome)?;
+        writer.write_all(b"\t")?;
+        write!(writer, "{}\t", self.position)?;
+        write_array(&mut writer, &self.id, b",")?;
+        writer.write_all(b"\t")?;
+        writer.write_all(&self.reference)?;
+        writer.write_all(b"\t")?;
+        write_array(&mut writer, &self.alternative, b",")?;
+        writer.write_all(b"\t")?;
+        if let Some(qual) = self.qual.as_ref() {
+            if (qual.round() - *qual).abs() < 0.000_000_01 {
+                write!(writer, "{:.1}", qual)?;
+            } else {
+                write!(writer, "{}", qual)?;
+            }
+        } else {
+            writer.write_all(b".")?;
+        }
+        writer.write_all(b"\t")?;
+        write_array(&mut writer, &self.filter, b",")?;
+        writer.write_all(b"\t")?;
+        write_info(&mut writer, &self.info)?;
+        if !self.format.is_empty() {
+            writer.write_all(b"\t")?;
+            write_array(&mut writer, &self.format, b":")?;
+            for one_genotype in self.genotype.iter() {
+                writer.write_all(b"\t")?;
+                for (i, v) in one_genotype.iter().enumerate() {
                     if i != 0 {
                         writer.write_all(b":")?;
                     }
-                    writer.write_all(encode_vcf_value(&one).as_bytes())?;
-                }
-            }
-            writer.write_all(b"\t")?;
-            for (si, one_sample) in samples.iter().enumerate() {
-                if si != 0 {
-                    writer.write_all(b"\t")?;
-                }
-                if let Some(call_result) = self.call.get(one_sample) {
-                    for (i, one_format) in self.format.iter().enumerate() {
-                        if i != 0 {
-                            writer.write_all(b":")?;
-                        }
-                        if let Some(one_call) = call_result.get(one_format) {
-                            write_encoded_vec_or_dot(writer, one_call)?;
-                        } else {
-                            writer.write_all(b".")?;
-                        }
-                    }
-                } else {
-                    writer.write_all(b".")?;
+                    write_array(&mut writer, v, b",")?;
                 }
             }
         }
 
         writer.write_all(b"\n")?;
-
         Ok(())
     }
 }

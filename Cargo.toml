@@ -1,16 +1,15 @@
 [package]
 name = "vcf"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["OKAMURA, Yasunobu <okamura@informationsea.info>"]
 edition = "2018"
 license = "Apache-2.0"
-description = "Torelant VCF Parser"
+description = "VCF Parser"
 homepage = "https://github.com/informationsea/vcf-rs"
 repository = "https://github.com/informationsea/vcf-rs"
 keywords = ["VCF", "bioinformatics", "parser"]
 categories = ["parser-implementations", "science"]
 exclude = ["testfiles/*"]
-readme = "README.md"
 
 [badges]
 appveyor = { repository = "informationsea/vcf-rs", branch = "master", service = "github" }
@@ -18,8 +17,10 @@ travis-ci = { repository = "informationsea/vcf-rs", branch = "master" }
 maintenance = { status = "experimental" }
 
 [dependencies]
+nom = "5"
 failure = "0.1"
-indexmap = "1"
+lazy_static = "1"
 
 [dev-dependencies]
+clap = "2"
 flate2 = "1"

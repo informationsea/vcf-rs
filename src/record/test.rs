@@ -1,436 +1,406 @@
 use super::*;
+use crate::VCFError;
+use nom::{self, bytes::complete::is_not, bytes::complete::tag, bytes::complete::take_while};
 
-#[allow(clippy::unreadable_literal)]
+fn create_header() -> VCFHeader {
+    let vcf_data = include_bytes!("../../testfiles/NA12878-subset.vcf");
+    let mut vcf_reader = io::BufReader::new(&vcf_data[..]);
+    let (_, _, header) = crate::header::parse_header(&mut vcf_reader).unwrap();
+    header
+}
+
 #[test]
-fn test_parse_vcf_record() -> Result<(), VCFParseError> {
-    assert_eq!(VCFRecord::parse_line("19\t11472995\t.\tA\tC,AC\t.\tPASS\tCONTQ=93;DP=84;ECNT=1;GERMQ=93;MBQ=20,20,25;MFRL=208,245,147;MMQ=60,60,60;MPOS=11,34;NALOD=-2.009,1.16;NLOD=5.61,9.79;POPAF=6,6;SEQQ=3;STRANDQ=5;TLOD=3.84,6.63\tGT:AD:AF:DP:F1R2:F2R1:SB\t0/1/2:20,7,6:0.199,0.211:33:6,4,2:14,3,4:2,18,0,13\t0/0:35,3,0:0.084,0.023:38:13,2,0:22,1,0:0,35,0,3",
-        &["SRP171128-4213-4Met".to_string(), "SRP171128-4213N".to_string()])?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: svec!["PASS"],
-            info: sihash![
-                ("CONTQ", svec!["93"]),
-                ("DP", svec!["84"]),
-                ("ECNT", svec!["1"]),
-                ("GERMQ", svec!["93"]),
-                ("MBQ", svec!["20", "20", "25"]),
-                ("MFRL", svec!["208", "245", "147"]),
-                ("MMQ", svec!["60", "60", "60"]),
-                ("MPOS", svec!["11", "34"]),
-                ("NALOD", svec!["-2.009", "1.16"]),
-                ("NLOD", svec!["5.61", "9.79"]),
-                ("POPAF", svec!["6", "6"]),
-                ("SEQQ", svec!["3"]),
-                ("STRANDQ", svec!["5"]),
-                ("TLOD", svec!["3.84", "6.63"])
+fn test_parse_nested_separated_values() {
+    let mut result = Vec::new();
+    let (rest, _) =
+        parser::parse_nested_separated_values::<_, _, _, _, _, (&[u8], nom::error::ErrorKind)>(
+            &mut result,
+            b"A:X:Z,B:Y,C,D:E:F:G 1",
+            is_not(&b",: "[..]),
+            tag(b":"),
+            tag(b","),
+            false,
+        )
+        .unwrap();
+    assert_eq!(rest, b" 1");
+    assert_eq!(
+        result,
+        vec![
+            vec![&b"A"[..], &b"X"[..], &b"Z"[..]],
+            vec![&b"B"[..], &b"Y"[..]],
+            vec![&b"C"[..]],
+            vec![&b"D"[..], &b"E"[..], &b"F"[..], &b"G"[..]]
+        ]
+    );
+
+    let (rest, _) =
+        parser::parse_nested_separated_values::<_, _, _, _, _, (&[u8], nom::error::ErrorKind)>(
+            &mut result,
+            b" 1",
+            is_not(&b",: "[..]),
+            tag(b":"),
+            tag(b","),
+            false,
+        )
+        .unwrap();
+    assert_eq!(rest, b" 1");
+    assert_eq!(result, Vec::<Vec<&[u8]>>::new());
+}
+
+#[test]
+fn test_parse_separated_values() {
+    let mut result = Vec::new();
+    let (rest, _) = parser::parse_separated_values::<_, _, _, (&[u8], nom::error::ErrorKind)>(
+        &mut result,
+        b"A X,B Y,C=Z_x",
+        is_not(&b",_"[..]),
+        tag(b","),
+        false,
+    )
+    .unwrap();
+    assert_eq!(rest, b"_x");
+    assert_eq!(result, vec![&b"A X"[..], &b"B Y"[..], &b"C=Z"[..]]);
+
+    let (rest, _) = parser::parse_separated_values::<_, _, _, (&[u8], nom::error::ErrorKind)>(
+        &mut result,
+        b"1:2",
+        is_not(&b":"[..]),
+        tag(b":"),
+        false,
+    )
+    .unwrap();
+    assert_eq!(rest, b"");
+    assert_eq!(result, vec![&b"1"[..], &b"2"[..]]);
+
+    let (rest, _) = parser::parse_separated_values::<_, _, _, (&[u8], nom::error::ErrorKind)>(
+        &mut result,
+        b"1:: 2",
+        take_while(|x| x != b':' && x != b' '),
+        tag(b":"),
+        false,
+    )
+    .unwrap();
+    assert_eq!(rest, b" 2");
+    assert_eq!(result, vec![&b"1"[..], &b""[..], &b""[..]]);
+}
+
+#[test]
+fn test_parse_info() {
+    let test_info1 = b"AC=54;AF=1;AN=54;DB;DP=749\t";
+    let mut parsed_info = Vec::new();
+    let (rest, _) =
+        parser::parse_info::<(&[u8], nom::error::ErrorKind)>(test_info1, &mut parsed_info).unwrap();
+    assert_eq!(
+        parsed_info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DB".to_vec(), vec![]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+    assert_eq!(rest, b"\t");
+}
+
+#[test]
+#[allow(clippy::unreadable_literal)]
+fn test_parse_record1() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+    assert_eq!(record.info(b"AC"), Some(&vec![b"54".to_vec()]));
+    assert_eq!(record.info(b"AF"), Some(&vec![b"1".to_vec()]));
+    assert_eq!(record.info(b"AN"), Some(&vec![b"54".to_vec()]));
+    assert_eq!(record.info(b"DP"), Some(&vec![b"749".to_vec()]));
+
+    assert_eq!(record.format, vec![&b"GT"[..], &b"AD"[..], &b"DP"[..]]);
+    assert_eq!(
+        record.genotype,
+        vec![
+            vec![
+                vec![&b"1/1"[..]],
+                vec![&b"0"[..], &b"14"[..]],
+                vec![&b"14"[..]]
             ],
-            format: svec!["GT", "AD", "AF", "DP", "F1R2", "F2R1", "SB"],
-            call: shash![
-                ("SRP171128-4213-4Met", shash![
-                    ("GT", svec!["0/1/2"]),
-                    ("AD", svec!["20", "7", "6"]),
-                    ("AF", svec!["0.199", "0.211"]),
-                    ("DP", svec!["33"]),
-                    ("F1R2", svec!["6", "4", "2"]),
-                    ("F2R1", svec!["14", "3", "4"]),
-                    ("SB", svec!["2", "18", "0", "13"])
-                ]),
-                ("SRP171128-4213N", shash![
-                    ("GT", svec!["0/0"]),
-                    ("AD", svec!["35", "3", "0"]),
-                    ("AF", svec!["0.084", "0.023"]),
-                    ("DP", svec!["38"]),
-                    ("F1R2", svec!["13", "2", "0"]),
-                    ("F2R1", svec!["22", "1", "0"]),
-                    ("SB", svec!["0", "35", "0", "3"])
-                ])
+            vec![
+                vec![&b"1/1"[..]],
+                vec![&b"0"[..], &b"19"[..]],
+                vec![&b"19"[..]]
             ]
-        }
+        ]
     );
-
-    assert_eq!(VCFRecord::parse_line("19\t11472995\t.\tA\tC,AC\t.\tPASS\tCONTQ=93;DP=84;ECNT=1;GERMQ=93;MBQ=20,20,25;MFRL=208,245,147;MMQ=60,60,60;MPOS=11,34;NALOD=-2.009,1.16;NLOD=5.61,9.79;POPAF=6,6;SEQQ=3;STRANDQ=5;TLOD=3.84,6.63\tGT:AD:AF:DP:F1R2:F2R1:SB\t0/1/2:20,7,6:0.199,0.211:33:6,4,2:14,3,4:2,18,0,13",
-        &["SRP171128-4213-4Met".to_string(), "SRP171128-4213N".to_string()])?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: svec!["PASS"],
-            info: sihash![
-                ("CONTQ", svec!["93"]),
-                ("DP", svec!["84"]),
-                ("ECNT", svec!["1"]),
-                ("GERMQ", svec!["93"]),
-                ("MBQ", svec!["20", "20", "25"]),
-                ("MFRL", svec!["208", "245", "147"]),
-                ("MMQ", svec!["60", "60", "60"]),
-                ("MPOS", svec!["11", "34"]),
-                ("NALOD", svec!["-2.009", "1.16"]),
-                ("NLOD", svec!["5.61", "9.79"]),
-                ("POPAF", svec!["6", "6"]),
-                ("SEQQ", svec!["3"]),
-                ("STRANDQ", svec!["5"]),
-                ("TLOD", svec!["3.84", "6.63"])
-            ],
-            format: svec!["GT", "AD", "AF", "DP", "F1R2", "F2R1", "SB"],
-            call: shash![
-                ("SRP171128-4213-4Met", shash![
-                    ("GT", svec!["0/1/2"]),
-                    ("AD", svec!["20", "7", "6"]),
-                    ("AF", svec!["0.199", "0.211"]),
-                    ("DP", svec!["33"]),
-                    ("F1R2", svec!["6", "4", "2"]),
-                    ("F2R1", svec!["14", "3", "4"]),
-                    ("SB", svec!["2", "18", "0", "13"])
-                ])
-            ]
-        }
-    );
-
-    assert_eq!(VCFRecord::parse_line("19\t11472995\t.\tA\tC,AC\t.\tPASS\tCONTQ=93;DP=84;ECNT=1;GERMQ=93;MBQ=20,20,25;MFRL=208,245,147;MMQ=60,60,60;MPOS=11,34;NALOD=-2.009,1.16;NLOD=5.61,9.79;POPAF=6,6;SEQQ=3;STRANDQ=5;TLOD=3.84,6.63\tGT:AD:AF:DP:F1R2:F2R1:SB",
-        &["SRP171128-4213-4Met".to_string(), "SRP171128-4213N".to_string()])?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: svec!["PASS"],
-            info: sihash![
-                ("CONTQ", svec!["93"]),
-                ("DP", svec!["84"]),
-                ("ECNT", svec!["1"]),
-                ("GERMQ", svec!["93"]),
-                ("MBQ", svec!["20", "20", "25"]),
-                ("MFRL", svec!["208", "245", "147"]),
-                ("MMQ", svec!["60", "60", "60"]),
-                ("MPOS", svec!["11", "34"]),
-                ("NALOD", svec!["-2.009", "1.16"]),
-                ("NLOD", svec!["5.61", "9.79"]),
-                ("POPAF", svec!["6", "6"]),
-                ("SEQQ", svec!["3"]),
-                ("STRANDQ", svec!["5"]),
-                ("TLOD", svec!["3.84", "6.63"])
-            ],
-            format: svec!["GT", "AD", "AF", "DP", "F1R2", "F2R1", "SB"],
-            call: HashMap::new()
-        }
-    );
-
-    assert_eq!(VCFRecord::parse_line("19\t11472995\t.\tA\tC,AC\t.\tPASS\tCONTQ=93;DP=84;ECNT=1;GERMQ=93;MBQ=20,20,25;MFRL=208,245,147;MMQ=60,60,60;MPOS=11,34;NALOD=-2.009,1.16;NLOD=5.61,9.79;POPAF=6,6;SEQQ=3;STRANDQ=5;TLOD=3.84,6.63",
-        &["SRP171128-4213-4Met".to_string(), "SRP171128-4213N".to_string()])?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: svec!["PASS"],
-            info: sihash![
-                ("CONTQ", svec!["93"]),
-                ("DP", svec!["84"]),
-                ("ECNT", svec!["1"]),
-                ("GERMQ", svec!["93"]),
-                ("MBQ", svec!["20", "20", "25"]),
-                ("MFRL", svec!["208", "245", "147"]),
-                ("MMQ", svec!["60", "60", "60"]),
-                ("MPOS", svec!["11", "34"]),
-                ("NALOD", svec!["-2.009", "1.16"]),
-                ("NLOD", svec!["5.61", "9.79"]),
-                ("POPAF", svec!["6", "6"]),
-                ("SEQQ", svec!["3"]),
-                ("STRANDQ", svec!["5"]),
-                ("TLOD", svec!["3.84", "6.63"])
-            ],
-            format: Vec::new(),
-            call: HashMap::new()
-        }
-    );
-
     assert_eq!(
-        VCFRecord::parse_line(
-            "19\t11472995\t.\tA\tC,AC\t.\tPASS",
-            &[
-                "SRP171128-4213-4Met".to_string(),
-                "SRP171128-4213N".to_string()
-            ]
-        )?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: svec!["PASS"],
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new()
-        }
+        record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"GT"),
+        Some(&vec![b"1/1".to_vec()])
     );
-
     assert_eq!(
-        VCFRecord::parse_line(
-            "19\t11472995\t.\tA\tC,AC\t.\t.",
-            &[
-                "SRP171128-4213-4Met".to_string(),
-                "SRP171128-4213N".to_string()
-            ]
-        )?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new()
-        }
+        record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"AD"),
+        Some(&vec![b"0".to_vec(), b"14".to_vec()])
     );
-
     assert_eq!(
-        VCFRecord::parse_line(
-            "19\t11472995\t.\tA\tC,AC\t.",
-            &[
-                "SRP171128-4213-4Met".to_string(),
-                "SRP171128-4213N".to_string()
-            ]
-        )?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new()
-        }
+        record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"DP"),
+        Some(&vec![b"14".to_vec()])
     );
-
-    assert_eq!(
-        VCFRecord::parse_line(
-            "19\t11472995\t.\tA\tC,AC\t20",
-            &[
-                "SRP171128-4213-4Met".to_string(),
-                "SRP171128-4213N".to_string()
-            ]
-        )?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: Some("20".to_string()),
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new()
-        }
-    );
-
-    assert_eq!(
-        VCFRecord::parse_line(
-            "19\t11472995\t.\tA\tC,AC",
-            &[
-                "SRP171128-4213-4Met".to_string(),
-                "SRP171128-4213N".to_string()
-            ]
-        )?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: Vec::new(),
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new()
-        }
-    );
-
-    assert_eq!(
-        VCFRecord::parse_line(
-            "19\t11472995\thoge\tA\tC,AC",
-            &[
-                "SRP171128-4213-4Met".to_string(),
-                "SRP171128-4213N".to_string()
-            ]
-        )?,
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: svec!["hoge".to_string()],
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new()
-        }
-    );
-
-    assert!(VCFRecord::parse_line("19\t11472995\thoge\tA", &[]).is_err());
-
     Ok(())
 }
 
-
-#[allow(clippy::unreadable_literal)]
 #[test]
-fn test_write_line() -> io::Result<()> {
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: svec!["hoge".to_string()],
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new(),
-        }
-        .write_line(&mut line, &[])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: svec!["hoge".to_string()],
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: IndexMap::new(),
-            format: Vec::new(),
-            call: HashMap::new(),
-        }
-        .write_line(&mut line, &svec!["foo"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\t.\t.\t.\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: svec!["hoge".to_string()],
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: sihash![
-                ("HOGE", Vec::<String>::new()),
-                ("FOO", svec!["TEST"]),
-                ("BAR", svec!["TEST1", "TEST2"])
-            ],
-            format: svec!["GT", "AD"],
-            call: shash![(
-                "foo",
-                shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
-            )],
-        }
-        .write_line(&mut line, &svec!["foo"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: svec!["hoge", "foo", "bar"],
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: sihash![
-                ("HOGE", Vec::<String>::new()),
-                ("FOO", svec!["TEST"]),
-                ("BAR", svec!["TEST1", "TEST2"])
-            ],
-            format: svec!["GT", "AD"],
-            call: shash![(
-                "foo",
-                shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
-            )],
-        }
-        .write_line(&mut line, &svec!["foo", "bar"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge;foo;bar\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t.\n"[..],
-            &line as &[u8]
-        );
-    }
-
-    {
-        let mut line = Vec::new();
-        VCFRecord {
-            chromosome: "19".to_string(),
-            position: 11472995,
-            id: svec!["hoge", "foo"],
-            reference: "A".to_string(),
-            alternative: svec!["C", "AC"],
-            quality: None,
-            filter: Vec::new(),
-            info: sihash![
-                ("HOGE", Vec::<String>::new()),
-                ("FOO", svec!["TEST"]),
-                ("BAR", svec!["TEST1", "TEST2"])
-            ],
-            format: svec!["GT", "AD"],
-            call: shash![
-                (
-                    "foo",
-                    shash![("GT", svec!["0/0"]), ("AD", svec!["10", "20"])]
-                ),
-                ("bar", shash![("GT", svec!["0/1"])])
-            ],
-        }
-        .write_line(&mut line, &svec!["foo", "bar"])?;
-
-        assert_eq!(
-            &b"19\t11472995\thoge;foo\tA\tC,AC\t.\t.\tHOGE;FOO=TEST;BAR=TEST1,TEST2\tGT:AD\t0/0:10,20\t0/1:.\n"[..],
-            &line as &[u8]
-        );
-    }
-
+#[allow(clippy::unreadable_literal)]
+fn test_parse_record2() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
     Ok(())
 }
 
+#[test]
+#[allow(clippy::unreadable_literal)]
+fn test_parse_record3() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    Ok(())
+}
+
+#[test]
+#[allow(clippy::unreadable_literal)]
+fn test_parse_record4() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\tPASS"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    assert_eq!(record.filter, vec![&b"PASS"[..]]);
+    Ok(())
+}
+
+#[test]
+#[allow(clippy::unreadable_literal)]
+fn test_parse_record5() -> Result<(), VCFError> {
+    let test_record1 =
+        &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\n"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+#[allow(clippy::unreadable_literal)]
+fn test_parse_record6() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, Vec::<&[u8]>::new());
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, Vec::<&[u8]>::new());
+    assert_eq!(record.qual, None);
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+    assert_eq!(record.format, vec![&b"GT"[..], &b"AD"[..], &b"DP"[..]]);
+    Ok(())
+}
+
+#[test]
+#[allow(clippy::unreadable_literal)]
+#[allow(clippy::cognitive_complexity)]
+fn test_parse_record7() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+    assert_eq!(record.format, vec![&b"GT"[..], &b"AD"[..], &b"DP"[..]]);
+    assert_eq!(
+        record.genotype,
+        vec![
+            vec![
+                vec![&b"1/1"[..]],
+                vec![&b"0"[..], &b"14"[..]],
+                vec![&b"14"[..]]
+            ],
+            vec![
+                vec![&b"1/1"[..]],
+                vec![&b"0"[..], &b"19"[..]],
+                vec![&b"19"[..]]
+            ]
+        ]
+    );
+
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA"[..];
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\tPASS"[..];
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    assert_eq!(record.filter, vec![&b"PASS"[..]]);
+
+    let test_record1 =
+        &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\n"[..];
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(25743.5));
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+
+    let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP"[..];
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, Vec::<&[u8]>::new());
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, Vec::<&[u8]>::new());
+    assert_eq!(record.qual, None);
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"54".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec()]),
+        ]
+    );
+    assert_eq!(record.format, vec![&b"GT"[..], &b"AD"[..], &b"DP"[..]]);
+
+    let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\t.\n"[..];
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, Vec::<&[u8]>::new());
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, Vec::<&[u8]>::new());
+    assert_eq!(record.qual, None);
+    assert_eq!(record.filter, Vec::<&[u8]>::new());
+    assert_eq!(record.info, vec![]);
+    Ok(())
+}
+
+#[test]
+fn test_write() {
+    let mut vcf_record = VCFRecord::new(Rc::new(create_header()));
+    let test_record1 = &b"13\t32889968\t.\tG\tA\t.\t.\tAC=1;AF=0.5\n"[..];
+    parse_record(test_record1, &mut vcf_record).unwrap();
+    let mut write_data = Vec::new();
+    vcf_record.write_record(&mut write_data).unwrap();
+    assert_eq!(write_data, test_record1);
+
+    let test_record2 =
+        &b"13\t32889968\t123\tG\tA\t102.0\tLOW,HIGH\tAC=1;AF=0.5\tGT:DP\t1/1:10\t0/1:20\n"[..];
+    parse_record(test_record2, &mut vcf_record).unwrap();
+    let mut write_data = Vec::new();
+    vcf_record.write_record(&mut write_data).unwrap();
+    assert_eq!(write_data, test_record2);
+}

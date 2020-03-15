@@ -1,4 +1,9 @@
-use super::*;
+use super::{U8Vec, VCFError, VCFErrorKind, VResult};
+use std::collections::{hash_map::Keys, HashMap};
+use std::io::BufRead;
+mod parser;
+
+pub use parser::parse_header_item;
 
 /// A number of entries of INFO or FORMAT.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -9,7 +14,7 @@ pub enum Number {
     Zero,
     Number(i32),
     Unknown,
-    Other(String),
+    Other(U8Vec),
 }
 
 /// An entry value type of INFO or FORMAT.
@@ -20,223 +25,275 @@ pub enum ValueType {
     Flag,
     Character,
     Float,
-    Other(String),
+    Other(U8Vec),
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum VCFVersion {
+    Vcf4_3,
+    Vcf4_2,
+    Vcf4_1,
+    Vcf4_0,
+    Other(U8Vec),
 }
 
 /// A content of header line.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VCFHeaderContent {
     INFO {
-        id: String,
+        id: U8Vec,
         number: Number,
         value_type: ValueType,
-        description: String,
-        source: Option<String>,
-        version: Option<String>,
+        description: U8Vec,
+        source: Option<U8Vec>,
+        version: Option<U8Vec>,
     },
     FORMAT {
-        id: String,
+        id: U8Vec,
         number: Number,
         value_type: ValueType,
-        description: String,
-        source: Option<String>,
-        version: Option<String>,
+        description: U8Vec,
+        source: Option<U8Vec>,
+        version: Option<U8Vec>,
+    },
+    ALT {
+        id: U8Vec,
+        description: U8Vec,
+    },
+    FILTER {
+        id: U8Vec,
+        description: U8Vec,
     },
     Contig {
-        id: String,
+        id: U8Vec,
         length: Option<u64>,
     },
-    FileFormat(String),
+    FileFormat(VCFVersion),
     Other,
 }
 
-fn vcf_header_line_helper<'a>(
-    line: &'a str,
-) -> Result<(&'a str, &'a str, HashMap<&'a str, &'a str>), VCFParseError> {
-    if !line.starts_with("##") {
-        return Err(VCFParseError::Other("Header line should starts with ##"));
-    }
-    if let Some(equal) = line.find('=') {
-        let key = &line[2..equal];
-        let value = &line[(equal + 1)..];
-
-        if &line[(equal + 1)..(equal + 2)] == "<" && line.ends_with('>') {
-            Ok((
-                key,
-                value,
-                vcf_header_parse_helper(&line[(equal + 2)..(line.len() - 1)]),
-            ))
-        } else {
-            Ok((key, value, HashMap::new()))
-        }
-    } else {
-        Ok((&line[2..], &line[0..0], HashMap::new()))
-    }
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct VCFHeaderInfoFormat<'a> {
+    pub id: &'a [u8],
+    pub number: &'a Number,
+    pub value_type: &'a ValueType,
+    pub description: &'a [u8],
+    pub source: Option<&'a [u8]>,
+    pub version: Option<&'a [u8]>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-enum HeaderParseState {
-    Key,
-    Value,
-    ValueInQuote,
-    QuoteEnded,
-}
-
-fn vcf_header_parse_helper<'a>(info: &'a str) -> HashMap<&'a str, &'a str> {
-    let mut result = HashMap::new();
-
-    let mut key_start: usize = 0;
-    let mut key_end: usize = 0;
-    let mut value_start: usize = 0;
-    let mut current: usize = 0;
-    let mut state = HeaderParseState::Key;
-
-    for ch in info.chars() {
-        match state {
-            HeaderParseState::Key => {
-                if ch == '=' {
-                    key_end = current;
-                    value_start = current + ch.len_utf8();
-                    state = HeaderParseState::Value;
-                }
-            }
-            HeaderParseState::Value => {
-                if ch == ',' {
-                    result.insert(&info[key_start..key_end], &info[value_start..current]);
-                    key_start = current + ch.len_utf8();
-                    state = HeaderParseState::Key;
-                } else if ch == '"' {
-                    value_start = current + ch.len_utf8();
-                    state = HeaderParseState::ValueInQuote;
-                }
-            }
-            HeaderParseState::ValueInQuote => {
-                if ch == '"' {
-                    result.insert(&info[key_start..key_end], &info[value_start..current]);
-                    state = HeaderParseState::QuoteEnded;
-                }
-            }
-            HeaderParseState::QuoteEnded => {
-                if ch == ',' {
-                    state = HeaderParseState::Key;
-                    key_start = current + ch.len_utf8();
-                }
-            }
-        }
-        current += ch.len_utf8();
-    }
-
-    if state == HeaderParseState::Value {
-        result.insert(&info[key_start..key_end], &info[value_start..current]);
-    }
-
-    result
+pub struct VCFHeaderFilterAlt<'a> {
+    pub id: &'a [u8],
+    pub description: &'a [u8],
 }
 
 /// A header line.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VCFHeaderLine {
-    pub line: String,
-    pub contents: VCFHeaderContent,
+    line: U8Vec,
+    contents: VCFHeaderContent,
 }
 
 impl VCFHeaderLine {
-    pub fn new(s: &str) -> Result<Self, VCFParseError> {
-        s.parse::<VCFHeaderLine>()
+    pub fn line(&self) -> &[u8] {
+        &self.line
     }
-}
 
-impl FromStr for VCFHeaderLine {
-    type Err = VCFParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parsed_result = vcf_header_line_helper(s)?;
-
-        let contents = match parsed_result.0 {
-            "fileformat" => VCFHeaderContent::FileFormat(parsed_result.1.to_string()),
-            "INFO" | "FORMAT" => {
-                let id = parsed_result
-                    .2
-                    .get("ID")
-                    .map(|x| x.to_string())
-                    .unwrap_or_else(|| "###NO_ID###".to_string());
-                let number = match parsed_result.2.get("Number") {
-                    Some(&"A") => Number::Allele,
-                    Some(&"G") => Number::Genotype,
-                    Some(&"R") => Number::Reference,
-                    Some(&"0") => Number::Zero,
-                    Some(&".") => Number::Unknown,
-                    Some(s) => s
-                        .parse::<i32>()
-                        .map(Number::Number)
-                        .unwrap_or_else(|_| Number::Other(s.to_string())),
-                    None => Number::Unknown,
-                };
-                let value_type = match parsed_result.2.get("Type") {
-                    Some(&"Integer") => ValueType::Integer,
-                    Some(&"String") => ValueType::String,
-                    Some(&"Flag") => ValueType::Flag,
-                    Some(&"Float") => ValueType::Float,
-                    Some(&"Character") => ValueType::Character,
-                    Some(s) => ValueType::Other(s.to_string()),
-                    None => ValueType::Other("".to_string()),
-                };
-                let description = parsed_result
-                    .2
-                    .get("Description")
-                    .map(|x| x.to_string())
-                    .unwrap_or_else(|| "##NO_DESCRIPTION##".to_string());
-                let source = parsed_result.2.get("Source").map(|x| x.to_string());
-                let version = parsed_result.2.get("Version").map(|x| x.to_string());
-
-                if parsed_result.0 == "INFO" {
-                    VCFHeaderContent::INFO {
-                        id,
-                        number,
-                        value_type,
-                        description,
-                        source,
-                        version,
-                    }
-                } else if parsed_result.0 == "FORMAT" {
-                    VCFHeaderContent::FORMAT {
-                        id,
-                        number,
-                        value_type,
-                        description,
-                        source,
-                        version,
-                    }
-                } else {
-                    unreachable!()
-                }
-            }
-            "contig" => VCFHeaderContent::Contig {
-                id: parsed_result
-                    .2
-                    .get("ID")
-                    .map(|x| x.to_string())
-                    .unwrap_or_else(|| "###NO_ID###".to_string()),
-                length: parsed_result
-                    .2
-                    .get("length")
-                    .map(|x| x.parse::<u64>().ok())
-                    .unwrap_or(None),
-            },
-            _ => VCFHeaderContent::Other,
-        };
-
-        Ok(VCFHeaderLine {
-            line: s.to_string(),
-            contents,
-        })
+    pub fn contents(&self) -> &VCFHeaderContent {
+        &self.contents
     }
 }
 
 /// VCF header struct.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VCFHeader {
-    pub items: Vec<VCFHeaderLine>,
-    pub samples: Vec<String>,
+    items: Vec<VCFHeaderLine>,
+    samples: Vec<U8Vec>,
+    info_key: HashMap<U8Vec, usize>,
+    format_key: HashMap<U8Vec, usize>,
+    alt_key: HashMap<U8Vec, usize>,
+    filter_key: HashMap<U8Vec, usize>,
+    sample_to_index: HashMap<U8Vec, usize>,
+}
+
+impl VCFHeader {
+    pub fn new(items: Vec<VCFHeaderLine>, samples: Vec<U8Vec>) -> VCFHeader {
+        VCFHeader {
+            info_key: create_info_key(&items),
+            format_key: create_format_key(&items),
+            alt_key: create_alt_key(&items),
+            filter_key: create_filter_key(&items),
+            sample_to_index: samples
+                .iter()
+                .enumerate()
+                .map(|(k, v)| (v.to_vec(), k))
+                .collect(),
+            items,
+            samples,
+        }
+    }
+    pub fn items(&self) -> &[VCFHeaderLine] {
+        &self.items
+    }
+
+    pub fn samples(&self) -> &[U8Vec] {
+        &self.samples
+    }
+
+    pub fn info_list(&self) -> Keys<U8Vec, usize> {
+        self.info_key.keys()
+    }
+
+    pub fn info<'a>(&'a self, key: &[u8]) -> Option<VCFHeaderInfoFormat<'a>> {
+        self.info_key
+            .get(key)
+            .map(|x| match &self.items[*x].contents() {
+                VCFHeaderContent::INFO {
+                    id,
+                    number,
+                    value_type,
+                    description,
+                    source,
+                    version,
+                } => VCFHeaderInfoFormat {
+                    id,
+                    number,
+                    value_type,
+                    description,
+                    source: source.as_ref().map(|x| -> &[u8] { &x }),
+                    version: version.as_ref().map(|x| -> &[u8] { &x }),
+                },
+                _ => unreachable!(),
+            })
+    }
+
+    pub fn format_list(&self) -> Keys<U8Vec, usize> {
+        self.format_key.keys()
+    }
+    pub fn format<'a>(&'a self, key: &[u8]) -> Option<VCFHeaderInfoFormat<'a>> {
+        self.format_key
+            .get(key)
+            .map(|x| match &self.items[*x].contents() {
+                VCFHeaderContent::FORMAT {
+                    id,
+                    number,
+                    value_type,
+                    description,
+                    source,
+                    version,
+                } => VCFHeaderInfoFormat {
+                    id,
+                    number,
+                    value_type,
+                    description,
+                    source: source.as_ref().map(|x| -> &[u8] { &x }),
+                    version: version.as_ref().map(|x| -> &[u8] { &x }),
+                },
+                _ => unreachable!(),
+            })
+    }
+
+    pub fn alt_list(&self) -> Keys<U8Vec, usize> {
+        self.alt_key.keys()
+    }
+
+    pub fn alt<'a>(&'a self, key: &[u8]) -> Option<VCFHeaderFilterAlt<'a>> {
+        self.alt_key
+            .get(key)
+            .map(|x| match &self.items[*x].contents() {
+                VCFHeaderContent::ALT { id, description } => VCFHeaderFilterAlt { id, description },
+                _ => unreachable!(),
+            })
+    }
+
+    pub fn filter_list(&self) -> Keys<U8Vec, usize> {
+        self.filter_key.keys()
+    }
+
+    pub fn filter<'a>(&'a self, key: &[u8]) -> Option<VCFHeaderFilterAlt<'a>> {
+        self.filter_key
+            .get(key)
+            .map(|x| match &self.items[*x].contents() {
+                VCFHeaderContent::FILTER { id, description } => {
+                    VCFHeaderFilterAlt { id, description }
+                }
+                _ => unreachable!(),
+            })
+    }
+
+    pub fn sample_index(&self, sample_name: &[u8]) -> Option<usize> {
+        self.sample_to_index.get(sample_name).cloned()
+    }
+}
+
+fn create_info_key(header_line: &[VCFHeaderLine]) -> HashMap<U8Vec, usize> {
+    header_line
+        .iter()
+        .enumerate()
+        .filter_map(|x| match &x.1.contents {
+            VCFHeaderContent::INFO { id, .. } => Some((id.to_vec(), x.0)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn create_format_key(header_line: &[VCFHeaderLine]) -> HashMap<U8Vec, usize> {
+    header_line
+        .iter()
+        .enumerate()
+        .filter_map(|x| match &x.1.contents {
+            VCFHeaderContent::FORMAT { id, .. } => Some((id.to_vec(), x.0)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn create_alt_key(header_line: &[VCFHeaderLine]) -> HashMap<U8Vec, usize> {
+    header_line
+        .iter()
+        .enumerate()
+        .filter_map(|x| match &x.1.contents {
+            VCFHeaderContent::ALT { id, .. } => Some((id.to_vec(), x.0)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn create_filter_key(header_line: &[VCFHeaderLine]) -> HashMap<U8Vec, usize> {
+    header_line
+        .iter()
+        .enumerate()
+        .filter_map(|x| match &x.1.contents {
+            VCFHeaderContent::FILTER { id, .. } => Some((id.to_vec(), x.0)),
+            _ => None,
+        })
+        .collect()
+}
+
+pub fn parse_header<R: BufRead>(
+    reader: &mut R,
+) -> Result<(u64, Option<U8Vec>, VCFHeader), VCFError> {
+    let mut line_num: u64 = 0;
+    let mut items = Vec::new();
+
+    loop {
+        let mut buffer = Vec::new();
+        line_num += 1;
+        reader.read_until(b'\n', &mut buffer)?;
+        if buffer.starts_with(b"##") {
+            let item = parser::parse_header_item(&buffer)
+                .map_err::<VCFError, _>(|_| VCFErrorKind::HeaderParseError(line_num).into())?;
+            items.push(item.1);
+        } else if buffer.starts_with(b"#") {
+            let samples = parser::parse_samples(&buffer)
+                .map_err::<VCFError, _>(|_| VCFErrorKind::HeaderParseError(line_num).into())?
+                .1;
+            return Ok((line_num, None, VCFHeader::new(items, samples)));
+        } else {
+            return Ok((line_num, Some(buffer), VCFHeader::new(items, Vec::new())));
+        }
+    }
 }
 
 #[cfg(test)]
