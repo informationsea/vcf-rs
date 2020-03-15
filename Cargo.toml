@@ -1,6 +1,6 @@
 [package]
 name = "vcf"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["OKAMURA, Yasunobu <okamura@informationsea.info>"]
 edition = "2018"
 license = "Apache-2.0"
@@ -10,6 +10,7 @@ repository = "https://github.com/informationsea/vcf-rs"
 keywords = ["VCF", "bioinformatics", "parser"]
 categories = ["parser-implementations", "science"]
 exclude = ["testfiles/*"]
+readme = "README.md"
 
 [badges]
 appveyor = { repository = "informationsea/vcf-rs", branch = "master", service = "github" }

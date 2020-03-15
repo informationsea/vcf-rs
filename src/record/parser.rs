@@ -219,17 +219,30 @@ where
 {
     let rest = match tag::<_, _, E>(b"\t")(rest) {
         Ok((rest, _)) => rest,
-        Err(_) => return Ok((rest, ())),
+        Err(_) => {
+            record.qual = None;
+            record.filter.clear();
+            record.info.clear();
+            record.format.clear();
+            record.genotype.clear();
+            return Ok((rest, ()));
+        }
     };
     let (rest, qual) = parse_float(rest)?;
     if qual == b"." {
-        record.qual = None
+        record.qual = None;
     } else {
         record.qual = Some(str::from_utf8(qual).unwrap().parse().unwrap());
     }
     let rest = match tag::<_, _, E>(b"\t")(rest) {
         Ok((rest, _)) => rest,
-        Err(_) => return Ok((rest, ())),
+        Err(_) => {
+            record.filter.clear();
+            record.info.clear();
+            record.format.clear();
+            record.genotype.clear();
+            return Ok((rest, ()));
+        }
     };
     let (rest, _) = parse_separated_values(
         &mut record.filter,
@@ -243,12 +256,21 @@ where
     }
     let rest = match tag::<_, _, E>(b"\t")(rest) {
         Ok((rest, _)) => rest,
-        Err(_) => return Ok((rest, ())),
+        Err(_) => {
+            record.info.clear();
+            record.format.clear();
+            record.genotype.clear();
+            return Ok((rest, ()));
+        }
     };
     let (rest, _) = parse_info(rest, &mut record.info)?;
     let rest = match tag::<_, _, E>(b"\t")(rest) {
         Ok((rest, _)) => rest,
-        Err(_) => return Ok((rest, ())),
+        Err(_) => {
+            record.format.clear();
+            record.genotype.clear();
+            return Ok((rest, ()));
+        }
     };
     let (rest, _) = parse_separated_values(
         &mut record.format,
@@ -262,7 +284,10 @@ where
     }
     let rest = match tag::<_, _, E>(b"\t")(rest) {
         Ok((rest, _)) => rest,
-        Err(_) => return Ok((rest, ())),
+        Err(_) => {
+            record.genotype.clear();
+            return Ok((rest, ()));
+        }
     };
     let (rest, _) = parse_double_nested_separated_values(
         &mut record.genotype,

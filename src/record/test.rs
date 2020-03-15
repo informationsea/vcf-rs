@@ -303,6 +303,9 @@ fn test_parse_record7() -> Result<(), VCFError> {
             ]
         ]
     );
+    assert_eq!(record.info(b"AC"), Some(&vec![b"54".to_vec()]));
+    assert_eq!(record.info(b"AF"), Some(&vec![b"1".to_vec()]));
+    assert_eq!(record.info(b"XX"), None);
 
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA"[..];
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
@@ -311,8 +314,16 @@ fn test_parse_record7() -> Result<(), VCFError> {
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
     assert_eq!(record.reference, b"G");
     assert_eq!(record.alternative, vec![b"A"]);
-    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
+    assert_eq!(record.qual, None);
+    assert_eq!(record.filter, Vec::<U8Vec>::new());
+    assert_eq!(record.info, vec![]);
+    assert_eq!(record.format, Vec::<U8Vec>::new());
+    assert_eq!(record.genotype, Vec::<Vec<Vec<U8Vec>>>::new());
+    assert_eq!(record.info(b"XX"), None);
+    assert_eq!(record.info(b"AC"), None);
+    assert_eq!(record.info(b"AF"), None);
 
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
@@ -352,6 +363,9 @@ fn test_parse_record7() -> Result<(), VCFError> {
             (b"DP".to_vec(), vec![b"749".to_vec()]),
         ]
     );
+    assert_eq!(record.info(b"AC"), Some(&vec![b"54".to_vec()]));
+    assert_eq!(record.info(b"AF"), Some(&vec![b"1".to_vec()]));
+    assert_eq!(record.info(b"XX"), None);
 
     let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP"[..];
 

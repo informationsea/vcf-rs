@@ -4,6 +4,8 @@ vcf-rs
 [![Build status](https://ci.appveyor.com/api/projects/status/0mc9d6lf42ovg5uy/branch/master?svg=true)](https://ci.appveyor.com/project/informationsea/vcf-rs/branch/master)
 [![Creates.io](http://meritbadge.herokuapp.com/vcf)](https://crates.io/crates/vcf)
 [![doc-rs](https://docs.rs/vcf/badge.svg)](https://docs.rs/vcf)
+[![GitHub](https://img.shields.io/github/license/informationsea/vcf-rs)](https://github.com/informationsea/vcf-rs)
+[![GitHub top language](https://img.shields.io/github/languages/top/informationsea/vcf-rs)](https://github.com/informationsea/vcf-rs)
 
 Rust implementation of VCF parser.
 

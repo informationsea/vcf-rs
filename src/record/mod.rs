@@ -51,7 +51,10 @@ impl VCFRecord {
     }
 
     pub fn info(&self, key: &[u8]) -> Option<&Vec<U8Vec>> {
-        self.info_index.get(key).map(|x| &self.info[*x].1)
+        self.info_index
+            .get(key)
+            .map(|x| self.info.get(*x).map(|y| &y.1))
+            .flatten()
     }
 
     pub fn genotype(&self, sample_name: &[u8], key: &[u8]) -> Option<&Vec<U8Vec>> {
