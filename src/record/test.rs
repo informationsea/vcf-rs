@@ -105,6 +105,7 @@ fn test_parse_info() {
 
 #[test]
 #[allow(clippy::unreadable_literal)]
+#[allow(clippy::cognitive_complexity)]
 fn test_parse_record1() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
     let mut record = VCFRecord::new(Rc::new(create_header()));
@@ -130,6 +131,34 @@ fn test_parse_record1() -> Result<(), VCFError> {
     assert_eq!(record.info(b"AF"), Some(&vec![b"1".to_vec()]));
     assert_eq!(record.info(b"AN"), Some(&vec![b"54".to_vec()]));
     assert_eq!(record.info(b"DP"), Some(&vec![b"749".to_vec()]));
+    assert_eq!(record.info_mut(b"DP"), Some(&mut vec![b"749".to_vec()]));
+    if let Some(x) = record.info_mut(b"DP") {
+        x.push(b"XXXX".to_vec());
+    }
+    assert_eq!(
+        record.info(b"DP"),
+        Some(&vec![b"749".to_vec(), b"XXXX".to_vec()])
+    );
+    assert_eq!(
+        record.insert_info(b"AC", vec![b"X".to_vec(), b"Y".to_vec()]),
+        Some(vec![b"54".to_vec()])
+    );
+    assert_eq!(
+        record.info(b"AC"),
+        Some(&vec![b"X".to_vec(), b"Y".to_vec()])
+    );
+    assert_eq!(record.insert_info(b"Z", vec![b"1".to_vec()]), None);
+    assert_eq!(record.info(b"Z"), Some(&vec![b"1".to_vec()]));
+    assert_eq!(
+        record.info,
+        vec![
+            (b"AC".to_vec(), vec![b"X".to_vec(), b"Y".to_vec()]),
+            (b"AF".to_vec(), vec![b"1".to_vec()]),
+            (b"AN".to_vec(), vec![b"54".to_vec()]),
+            (b"DP".to_vec(), vec![b"749".to_vec(), b"XXXX".to_vec()]),
+            (b"Z".to_vec(), vec![b"1".to_vec()])
+        ]
+    );
 
     assert_eq!(record.format, vec![&b"GT"[..], &b"AD"[..], &b"DP"[..]]);
     assert_eq!(
@@ -159,6 +188,105 @@ fn test_parse_record1() -> Result<(), VCFError> {
         record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"DP"),
         Some(&vec![b"14".to_vec()])
     );
+
+    assert_eq!(
+        record.genotype_mut(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"DP"),
+        Some(&mut vec![b"14".to_vec()])
+    );
+    if let Some(x) = record.genotype_mut(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"DP") {
+        x.push(b"XXX".to_vec());
+    }
+    assert_eq!(
+        record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"DP"),
+        Some(&vec![b"14".to_vec(), b"XXX".to_vec()])
+    );
+
+    assert_eq!(
+        record.insert_genotype(
+            b"ERP001775_HiSeq2000_SAMEA1531955-1",
+            b"AD",
+            vec![b"A".to_vec(), b"B".to_vec()]
+        ),
+        Some(vec![b"0".to_vec(), b"14".to_vec()])
+    );
+    assert_eq!(
+        record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"AD"),
+        Some(&vec![b"A".to_vec(), b"B".to_vec()])
+    );
+
+    assert_eq!(
+        record.insert_genotype(
+            b"ERP001775_HiSeq2000_SAMEA1531955-1",
+            b"X",
+            vec![b"100".to_vec()]
+        ),
+        None
+    );
+    assert_eq!(
+        record.insert_genotype(
+            b"ERP001775_HiSeq2000_SAMEA1531955-2",
+            b"X",
+            vec![b"200".to_vec()]
+        ),
+        None
+    );
+    assert_eq!(
+        record.insert_genotype(
+            b"ERP001775_HiSeq2000_SAMEA1531955-2",
+            b"Y",
+            vec![b"300".to_vec()]
+        ),
+        None
+    );
+    assert_eq!(
+        record.insert_genotype(
+            b"ERP001775_HiSeq2000_SAMEA1531955-2",
+            b"Z",
+            vec![b"400".to_vec()]
+        ),
+        None
+    );
+    assert_eq!(
+        record.insert_genotype(
+            b"ERP001775_HiSeq2000_SAMEA1531955-1",
+            b"Z",
+            vec![b"500".to_vec()]
+        ),
+        None
+    );
+    assert_eq!(
+        record.format,
+        vec![
+            &b"GT"[..],
+            &b"AD"[..],
+            &b"DP"[..],
+            &b"X"[..],
+            &b"Y"[..],
+            &b"Z"[..]
+        ]
+    );
+    assert_eq!(
+        record.genotype,
+        vec![
+            vec![
+                vec![&b"1/1"[..]],
+                vec![&b"A"[..], &b"B"[..]],
+                vec![&b"14"[..], &b"XXX"[..]],
+                vec![&b"100"[..]],
+                vec![&b"."[..]],
+                vec![&b"500"[..]]
+            ],
+            vec![
+                vec![&b"1/1"[..]],
+                vec![&b"0"[..], &b"19"[..]],
+                vec![&b"19"[..]],
+                vec![&b"200"[..]],
+                vec![&b"300"[..]],
+                vec![&b"400"[..]]
+            ]
+        ]
+    );
+
     Ok(())
 }
 

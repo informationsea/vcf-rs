@@ -57,6 +57,27 @@ impl VCFRecord {
             .flatten()
     }
 
+    pub fn info_mut(&mut self, key: &[u8]) -> Option<&mut Vec<U8Vec>> {
+        self.info_index
+            .get(key)
+            .cloned()
+            .map(move |x| self.info.get_mut(x).map(|y| &mut y.1))
+            .flatten()
+    }
+
+    pub fn insert_info(&mut self, key: &[u8], mut values: Vec<U8Vec>) -> Option<Vec<U8Vec>> {
+        if let Some(x) = self.info_mut(key) {
+            let mut ret = Vec::new();
+            ret.append(x);
+            x.append(&mut values);
+            Some(ret)
+        } else {
+            self.info.push((key.to_vec(), values));
+            self.info_index.insert(key.to_vec(), self.info.len() - 1);
+            None
+        }
+    }
+
     pub fn genotype(&self, sample_name: &[u8], key: &[u8]) -> Option<&Vec<U8Vec>> {
         self.header
             .sample_index(sample_name)
@@ -68,6 +89,53 @@ impl VCFRecord {
             .flatten()
             .flatten()
             .flatten()
+    }
+
+    pub fn genotype_mut(&mut self, sample_name: &[u8], key: &[u8]) -> Option<&mut Vec<U8Vec>> {
+        self.header
+            .sample_index(sample_name)
+            .map(move |x| {
+                self.format_index
+                    .get(key)
+                    .cloned()
+                    .map(move |y| self.genotype.get_mut(x).map(|z| z.get_mut(y)))
+            })
+            .flatten()
+            .flatten()
+            .flatten()
+    }
+
+    pub fn insert_genotype(
+        &mut self,
+        sample_name: &[u8],
+        key: &[u8],
+        mut values: Vec<U8Vec>,
+    ) -> Option<Vec<U8Vec>> {
+        if let Some(sample_index) = self.header.sample_index(sample_name) {
+            if let Some(x) = self.genotype_mut(sample_name, key) {
+                let mut ret = Vec::new();
+                ret.append(x);
+                x.append(&mut values);
+                Some(ret)
+            } else {
+                if let Some(format_index) = self.format_index.get(key) {
+                    while self.genotype[sample_index].len() < *format_index {
+                        self.genotype[sample_index].push(vec![b".".to_vec()]);
+                    }
+                } else {
+                    self.format.push(key.to_vec());
+                    self.format_index
+                        .insert(key.to_vec(), self.format.len() - 1);
+                    while self.genotype[sample_index].len() < self.format.len() - 1 {
+                        self.genotype[sample_index].push(vec![b".".to_vec()]);
+                    }
+                }
+                self.genotype[sample_index].push(values);
+                None
+            }
+        } else {
+            None
+        }
     }
 
     /// Recreate info and genotype index cache.
