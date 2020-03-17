@@ -3,7 +3,7 @@ use crate::VCFError;
 use nom::{self, bytes::complete::is_not, bytes::complete::tag, bytes::complete::take_while};
 
 fn create_header() -> VCFHeader {
-    let vcf_data = include_bytes!("../../testfiles/NA12878-subset.vcf");
+    let vcf_data = include_bytes!("../../testfiles/simple1.vcf");
     let mut vcf_reader = io::BufReader::new(&vcf_data[..]);
     let (_, _, header) = crate::header::parse_header(&mut vcf_reader).unwrap();
     header
