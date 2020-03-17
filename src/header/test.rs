@@ -5,8 +5,17 @@ use std::io::BufReader;
 #[test]
 fn test_header_item_parser() {
     assert!(parse_header_item(b"#CHROM").is_err());
+    assert!(VCFHeaderLine::from_bytes(b"#CHROM", 1).is_err());
     assert_eq!(
         parse_header_item(b"##fileformat=VCFv4.2\n").unwrap().1,
+        VCFHeaderLine {
+            contents: VCFHeaderContent::FileFormat(VCFVersion::Vcf4_2),
+            line: b"##fileformat=VCFv4.2\n".to_vec()
+        }
+    );
+
+    assert_eq!(
+        VCFHeaderLine::from_bytes(b"##fileformat=VCFv4.2\n", 1).unwrap(),
         VCFHeaderLine {
             contents: VCFHeaderContent::FileFormat(VCFVersion::Vcf4_2),
             line: b"##fileformat=VCFv4.2\n".to_vec()

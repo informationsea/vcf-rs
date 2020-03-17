@@ -109,8 +109,14 @@ fn test_parse_info() {
 fn test_parse_record1() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
     let mut record = VCFRecord::new(Rc::new(create_header()));
-
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+
+    let mut record2 = record.clone();
+    record2.parse_bytes(test_record1, 1)?;
+    assert_eq!(record, record2);
+    let record3 = VCFRecord::from_bytes(test_record1, 1, record.header.clone())?;
+    assert_eq!(record, record3);
+
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);

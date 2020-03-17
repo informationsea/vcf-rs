@@ -74,7 +74,7 @@ pub use header::{
     Number, VCFHeader, VCFHeaderContent, VCFHeaderFilterAlt, VCFHeaderInfoFormat, VCFHeaderLine,
     VCFVersion, ValueType,
 };
-pub use record::{VCFRecord, NOT_FOUND};
+pub use record::VCFRecord;
 pub type U8Vec = Vec<u8>;
 type VResult<I, O> = nom::IResult<I, O, nom::error::VerboseError<I>>;
 

@@ -1,7 +1,6 @@
 mod parser;
 
-use crate::U8Vec;
-use crate::VCFHeader;
+use crate::{U8Vec, VCFError, VCFErrorKind, VCFHeader};
 pub use parser::parse_record;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -44,6 +43,18 @@ impl VCFRecord {
             format_index: HashMap::new(),
             genotype: vec![],
         }
+    }
+
+    pub fn from_bytes(line: &[u8], line_num: u64, header: Rc<VCFHeader>) -> Result<Self, VCFError> {
+        let mut record = VCFRecord::new(header);
+        record.parse_bytes(line, line_num)?;
+        Ok(record)
+    }
+
+    pub fn parse_bytes(&mut self, line: &[u8], line_num: u64) -> Result<(), VCFError> {
+        parse_record(line, self)
+            .map_err(|_| -> VCFError { VCFErrorKind::RecordParseError(line_num).into() })?;
+        Ok(())
     }
 
     pub fn header(&self) -> &VCFHeader {
@@ -143,7 +154,7 @@ impl VCFRecord {
     pub fn recreate_info_and_genotype_index(&mut self) {
         // create info_index
         for v in self.info_index.values_mut() {
-            *v = crate::NOT_FOUND;
+            *v = NOT_FOUND;
         }
         for (i, k) in self.info.iter().enumerate() {
             if let Some(x) = self.info_index.get_mut(&k.0) {
@@ -155,7 +166,7 @@ impl VCFRecord {
 
         // create format_index
         for v in self.format_index.values_mut() {
-            *v = crate::NOT_FOUND;
+            *v = NOT_FOUND;
         }
         for (i, k) in self.format.iter().enumerate() {
             if let Some(x) = self.format_index.get_mut(k) {

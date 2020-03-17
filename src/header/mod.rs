@@ -1,6 +1,7 @@
 use super::{U8Vec, VCFError, VCFErrorKind, VResult};
 use std::collections::{hash_map::Keys, HashMap};
 use std::io::BufRead;
+use std::str::FromStr;
 mod parser;
 
 pub use parser::parse_header_item;
@@ -96,12 +97,27 @@ pub struct VCFHeaderLine {
 }
 
 impl VCFHeaderLine {
+    pub fn from_bytes(line: &[u8], line_num: u64) -> Result<Self, VCFError> {
+        parse_header_item(line)
+            .map_err(|_| VCFErrorKind::HeaderParseError(line_num).into())
+            .map(|x| x.1)
+    }
     pub fn line(&self) -> &[u8] {
         &self.line
     }
 
     pub fn contents(&self) -> &VCFHeaderContent {
         &self.contents
+    }
+}
+
+impl FromStr for VCFHeaderLine {
+    type Err = VCFError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_header_item(s.as_bytes())
+            .map_err(|_| VCFErrorKind::HeaderParseError(0).into())
+            .map(|x| x.1)
     }
 }
 
