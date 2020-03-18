@@ -98,7 +98,9 @@ impl<R: BufRead> VCFReader<R> {
         })
     }
 
-    pub fn next_record(&mut self, record: &mut record::VCFRecord) -> Result<(), VCFError> {
+    /// Read next record.
+    /// Return false if no record was remained.
+    pub fn next_record(&mut self, record: &mut record::VCFRecord) -> Result<bool, VCFError> {
         if let Some(val) = self.unprocessed_line.as_ref() {
             self.buffer.extend(val);
             self.unprocessed_line = None;
@@ -108,13 +110,13 @@ impl<R: BufRead> VCFReader<R> {
             self.current_line += 1;
         }
         if self.buffer.is_empty() {
-            return Err(VCFErrorKind::EOF.into());
+            return Ok(false);
         }
 
         record::parse_record(&self.buffer, record)
             .map_err(|_| VCFErrorKind::RecordParseError(self.current_line))?;
 
-        Ok(())
+        Ok(true)
     }
 
     pub fn header(&self) -> Rc<header::VCFHeader> {

@@ -3,51 +3,42 @@ use super::*;
 use std::io::BufReader;
 
 #[test]
-fn test_reader1() {
+fn test_reader1() -> Result<(), VCFError> {
     let mut simple_vcf = BufReader::new(&include_bytes!("../testfiles/simple1.vcf")[..]);
     let mut vcf_reader = VCFReader::new(&mut simple_vcf).unwrap();
     let mut vcf_record = record::VCFRecord::new(vcf_reader.header());
     let mut record_count = 0;
-    loop {
-        match vcf_reader.next_record(&mut vcf_record) {
-            Ok(_) => record_count += 1,
-            Err(e) if e.kind() == VCFErrorKind::EOF => break,
-            Err(_) => unreachable!(),
-        }
+    while vcf_reader.next_record(&mut vcf_record)? {
+        record_count += 1;
     }
     assert_eq!(record_count, 3);
+    Ok(())
 }
 
 #[test]
-fn test_reader2() {
+fn test_reader2() -> Result<(), VCFError> {
     let mut simple_vcf = BufReader::new(&include_bytes!("../testfiles/1kGP-subset.vcf")[..]);
     let mut vcf_reader = VCFReader::new(&mut simple_vcf).unwrap();
     let mut vcf_record = record::VCFRecord::new(vcf_reader.header());
     let mut record_count = 0;
-    loop {
-        match vcf_reader.next_record(&mut vcf_record) {
-            Ok(_) => record_count += 1,
-            Err(e) if e.kind() == VCFErrorKind::EOF => break,
-            Err(_) => unreachable!(),
-        }
+    while vcf_reader.next_record(&mut vcf_record)? {
+        record_count += 1;
     }
     assert_eq!(record_count, 306);
+    Ok(())
 }
 
 #[test]
-fn test_reader3() {
+fn test_reader3() -> Result<(), VCFError> {
     let mut simple_vcf = BufReader::new(&include_bytes!("../testfiles/bad1.vcf")[..]);
     let mut vcf_reader = VCFReader::new(&mut simple_vcf).unwrap();
     let mut vcf_record = record::VCFRecord::new(vcf_reader.header());
     let mut record_count = 0;
-    loop {
-        match vcf_reader.next_record(&mut vcf_record) {
-            Ok(_) => record_count += 1,
-            Err(e) if e.kind() == VCFErrorKind::EOF => break,
-            Err(_) => unreachable!(),
-        }
+    while vcf_reader.next_record(&mut vcf_record)? {
+        record_count += 1;
     }
     assert_eq!(record_count, 2);
+    Ok(())
 }
 
 #[test]
@@ -58,7 +49,7 @@ fn test_writer() -> Result<(), VCFError> {
     let mut vcf_record = record::VCFRecord::new(vcf_reader.header());
     let mut buffer = Vec::new();
     let mut vcf_writer = VCFWriter::new(&mut buffer, &vcf_reader.header())?;
-    while let Ok(_) = vcf_reader.next_record(&mut vcf_record) {
+    while vcf_reader.next_record(&mut vcf_record)? {
         vcf_writer.write_record(&vcf_record)?;
     }
     assert_eq!(&vcf_bytes[..], &buffer[..]);

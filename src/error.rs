@@ -14,8 +14,6 @@ pub enum VCFErrorKind {
     RecordParseError(u64),
     #[fail(display = "I/O Error")]
     IoError,
-    #[fail(display = "End of File")]
-    EOF,
     #[fail(display = "Utf8 Error")]
     Utf8Error,
 }
