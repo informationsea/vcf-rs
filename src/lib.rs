@@ -10,7 +10,7 @@
 //!
 //! fn main() -> Result<(), VCFError> {
 //!     let mut reader = VCFReader::new(BufReader::new(MultiGzDecoder::new(File::open(
-//!         "./testfiles/NA12878-subset.vcf.gz",
+//!         "./testfiles/1kGP-subset.vcf.gz",
 //!     )?)))?;
 //!
 //!     // access FILTER contents
@@ -34,22 +34,22 @@
 //!     // read one record
 //!     reader.next_record(&mut vcf_record)?;
 //!
-//!     // get record attributes
-//!     assert_eq!(vcf_record.chromosome, b"13");
-//!     assert_eq!(vcf_record.position, 32889968);
-//!     assert_eq!(vcf_record.id, Vec::<U8Vec>::new());
-//!     assert_eq!(vcf_record.reference, b"G");
-//!     assert_eq!(vcf_record.alternative, vec![b"A"]);
-//!     assert_eq!(vcf_record.qual, Some(25743.5));
-//!     assert_eq!(vcf_record.info(b"AC"), Some(&vec![b"54".to_vec()]));
-//!     assert_eq!(
-//!         vcf_record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"GT"),
-//!         Some(&vec![b"1/1".to_vec()])
-//!     );
-//!     assert_eq!(
-//!         vcf_record.genotype(b"ERP001775_HiSeq2000_SAMEA1531955-1", b"AD"),
-//!         Some(&vec![b"0".to_vec(), b"14".to_vec()])
-//!     );
+//!    // get record attributes
+//!    assert_eq!(vcf_record.chromosome, b"13");
+//!    assert_eq!(vcf_record.position, 32872836);
+//!    assert_eq!(vcf_record.id, Vec::<U8Vec>::new());
+//!    assert_eq!(vcf_record.reference, b"A");
+//!    assert_eq!(vcf_record.alternative, vec![b"C"]);
+//!    assert_eq!(vcf_record.qual, Some(495.23));
+//!    assert_eq!(vcf_record.info(b"AC"), Some(&vec![b"1".to_vec()]));
+//!    assert_eq!(
+//!        vcf_record.genotype(b"SRP150637__HG00099", b"GT"),
+//!        Some(&vec![b"0/0".to_vec()])
+//!    );
+//!    assert_eq!(
+//!        vcf_record.genotype(b"SRP150637__HG00099", b"AD"),
+//!        Some(&vec![b"31".to_vec(), b"0".to_vec()])
+//!    );
 //!
 //!     Ok(())
 //! }
