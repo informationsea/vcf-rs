@@ -206,6 +206,11 @@ where
         recognize(tuple((
             take_while1(is_digit),
             opt(tuple((tag(b"."), opt(take_while1(is_digit))))),
+            opt(tuple((
+                tag(b"e"),
+                alt((tag("+"), tag("-"))),
+                take_while1(is_digit),
+            ))),
         ))),
     ))(data)
 }

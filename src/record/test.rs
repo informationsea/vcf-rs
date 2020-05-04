@@ -328,6 +328,22 @@ fn test_parse_record3() -> Result<(), VCFError> {
 
 #[test]
 #[allow(clippy::unreadable_literal)]
+fn test_parse_record3_1() -> Result<(), VCFError> {
+    let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t8.39728e+06\r\n"[..];
+    let mut record = VCFRecord::new(Rc::new(create_header()));
+
+    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(record.chromosome, b"13");
+    assert_eq!(record.position, 32889968);
+    assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
+    assert_eq!(record.reference, b"G");
+    assert_eq!(record.alternative, vec![b"A"]);
+    assert_eq!(record.qual, Some(8.39728e+06));
+    Ok(())
+}
+
+#[test]
+#[allow(clippy::unreadable_literal)]
 fn test_parse_record4() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\tPASS"[..];
     let mut record = VCFRecord::new(Rc::new(create_header()));
