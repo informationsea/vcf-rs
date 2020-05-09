@@ -108,7 +108,7 @@ fn test_parse_info() {
 #[allow(clippy::cognitive_complexity)]
 fn test_parse_record1() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
 
     let mut record2 = record.clone();
@@ -300,7 +300,7 @@ fn test_parse_record1() -> Result<(), VCFError> {
 #[allow(clippy::unreadable_literal)]
 fn test_parse_record2() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
@@ -314,7 +314,7 @@ fn test_parse_record2() -> Result<(), VCFError> {
 #[allow(clippy::unreadable_literal)]
 fn test_parse_record3() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
 
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
@@ -330,7 +330,7 @@ fn test_parse_record3() -> Result<(), VCFError> {
 #[allow(clippy::unreadable_literal)]
 fn test_parse_record3_1() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t8.39728e+06\r\n"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
 
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
@@ -346,7 +346,7 @@ fn test_parse_record3_1() -> Result<(), VCFError> {
 #[allow(clippy::unreadable_literal)]
 fn test_parse_record4() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\tPASS"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
 
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
@@ -364,7 +364,7 @@ fn test_parse_record4() -> Result<(), VCFError> {
 fn test_parse_record5() -> Result<(), VCFError> {
     let test_record1 =
         &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\n"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
 
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
@@ -390,7 +390,7 @@ fn test_parse_record5() -> Result<(), VCFError> {
 #[allow(clippy::unreadable_literal)]
 fn test_parse_record6() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
 
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
@@ -418,7 +418,7 @@ fn test_parse_record6() -> Result<(), VCFError> {
 #[allow(clippy::cognitive_complexity)]
 fn test_parse_record7() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
-    let mut record = VCFRecord::new(Rc::new(create_header()));
+    let mut record = VCFRecord::new(create_header());
 
     assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
     assert_eq!(record.chromosome, b"13");
@@ -554,7 +554,7 @@ fn test_parse_record7() -> Result<(), VCFError> {
 
 #[test]
 fn test_write() {
-    let mut vcf_record = VCFRecord::new(Rc::new(create_header()));
+    let mut vcf_record = VCFRecord::new(create_header());
     let test_record1 = &b"13\t32889968\t.\tG\tA\t.\t.\tAC=1;AF=0.5\n"[..];
     parse_record(test_record1, &mut vcf_record).unwrap();
     let mut write_data = Vec::new();

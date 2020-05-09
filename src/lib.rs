@@ -29,7 +29,7 @@
 //!     );
 //!
 //!     // prepare VCFRecord object
-//!     let mut vcf_record = VCFRecord::new(reader.header());
+//!     let mut vcf_record = reader.empty_record();
 //!
 //!     // read one record
 //!     reader.next_record(&mut vcf_record)?;
@@ -63,7 +63,6 @@ extern crate failure;
 extern crate lazy_static;
 
 use std::io::prelude::*;
-use std::rc::Rc;
 
 mod error;
 mod header;
@@ -83,7 +82,7 @@ pub struct VCFReader<R: BufRead> {
     unprocessed_line: Option<Vec<u8>>,
     current_line: u64,
     reader: R,
-    vcf_header: Rc<VCFHeader>,
+    vcf_header: VCFHeader,
 }
 
 impl<R: BufRead> VCFReader<R> {
@@ -94,7 +93,7 @@ impl<R: BufRead> VCFReader<R> {
             unprocessed_line,
             current_line,
             reader,
-            vcf_header: Rc::new(vcf_header),
+            vcf_header,
         })
     }
 
@@ -119,8 +118,12 @@ impl<R: BufRead> VCFReader<R> {
         Ok(true)
     }
 
-    pub fn header(&self) -> Rc<header::VCFHeader> {
-        self.vcf_header.clone()
+    pub fn header(&self) -> &header::VCFHeader {
+        &self.vcf_header
+    }
+
+    pub fn empty_record(&self) -> VCFRecord {
+        VCFRecord::new(self.vcf_header.clone())
     }
 }
 

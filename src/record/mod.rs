@@ -4,14 +4,13 @@ use crate::{U8Vec, VCFError, VCFErrorKind, VCFHeader};
 pub use parser::parse_record;
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::rc::Rc;
 use std::usize;
 
 pub const NOT_FOUND: usize = usize::MAX;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VCFRecord {
-    header: Rc<VCFHeader>,
+    header: VCFHeader,
     pub chromosome: U8Vec,
     pub position: u64,
     pub id: Vec<U8Vec>,
@@ -27,7 +26,7 @@ pub struct VCFRecord {
 }
 
 impl VCFRecord {
-    pub fn new(header: Rc<VCFHeader>) -> Self {
+    pub fn new(header: VCFHeader) -> Self {
         VCFRecord {
             header,
             chromosome: vec![],
@@ -45,7 +44,7 @@ impl VCFRecord {
         }
     }
 
-    pub fn from_bytes(line: &[u8], line_num: u64, header: Rc<VCFHeader>) -> Result<Self, VCFError> {
+    pub fn from_bytes(line: &[u8], line_num: u64, header: VCFHeader) -> Result<Self, VCFError> {
         let mut record = VCFRecord::new(header);
         record.parse_bytes(line, line_num)?;
         Ok(record)

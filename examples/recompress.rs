@@ -5,7 +5,6 @@ use flate2::Compression;
 use std::boxed::Box;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use vcf;
 
 pub fn main() -> Result<(), vcf::VCFError> {
     let matches = App::new("Recompress VCF")
@@ -39,7 +38,7 @@ pub fn main() -> Result<(), vcf::VCFError> {
         },
     );
     let mut vcf_reader = vcf::VCFReader::new(reader)?;
-    let mut record = vcf::VCFRecord::new(vcf_reader.header());
+    let mut record = vcf_reader.empty_record();
 
     let writer = GzEncoder::new(File::create(output_vcf_path)?, Compression::default());
     let mut vcf_writer = vcf::VCFWriter::new(writer, &vcf_reader.header())?;
