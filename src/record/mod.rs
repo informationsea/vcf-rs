@@ -51,7 +51,7 @@ impl VCFRecord {
     }
 
     pub fn parse_bytes(&mut self, line: &[u8], line_num: u64) -> Result<(), VCFError> {
-        parse_record(line, self)
+        parse_record::<nom::error::VerboseError<_>>(line, self)
             .map_err(|_| -> VCFError { VCFErrorKind::RecordParseError(line_num).into() })?;
         Ok(())
     }

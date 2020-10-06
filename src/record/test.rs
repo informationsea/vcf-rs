@@ -109,7 +109,10 @@ fn test_parse_info() {
 fn test_parse_record1() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
     let mut record = VCFRecord::new(create_header());
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
 
     let mut record2 = record.clone();
     record2.parse_bytes(test_record1, 1)?;
@@ -301,7 +304,10 @@ fn test_parse_record1() -> Result<(), VCFError> {
 fn test_parse_record2() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA"[..];
     let mut record = VCFRecord::new(create_header());
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -316,7 +322,10 @@ fn test_parse_record3() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
     let mut record = VCFRecord::new(create_header());
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -332,7 +341,10 @@ fn test_parse_record3_1() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t8.39728e+06\r\n"[..];
     let mut record = VCFRecord::new(create_header());
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -348,7 +360,10 @@ fn test_parse_record4() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\tPASS"[..];
     let mut record = VCFRecord::new(create_header());
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -366,7 +381,10 @@ fn test_parse_record5() -> Result<(), VCFError> {
         &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\n"[..];
     let mut record = VCFRecord::new(create_header());
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -392,7 +410,10 @@ fn test_parse_record6() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP"[..];
     let mut record = VCFRecord::new(create_header());
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, Vec::<&[u8]>::new());
@@ -420,7 +441,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP\t1/1:0,14:14\t1/1:0,19:19\n"[..];
     let mut record = VCFRecord::new(create_header());
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -458,7 +482,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
     assert_eq!(record.info(b"XX"), None);
 
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA"[..];
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -474,7 +501,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
     assert_eq!(record.info(b"AF"), None);
 
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\r\n"[..];
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -484,7 +514,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
 
     let test_record1 = &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\tPASS"[..];
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -496,7 +529,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
     let test_record1 =
         &b"13\t32889968\trs206119,rs60320776\tG\tA\t25743.5\t.\tAC=54;AF=1;AN=54;DP=749\n"[..];
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, vec![&b"rs206119"[..], &b"rs60320776"[..]]);
@@ -519,7 +555,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
 
     let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\tAC=54;AF=1;AN=54;DP=749\tGT:AD:DP"[..];
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, Vec::<&[u8]>::new());
@@ -540,7 +579,10 @@ fn test_parse_record7() -> Result<(), VCFError> {
 
     let test_record1 = &b"13\t32889968\t.\tG\t.\t.\t.\t.\n"[..];
 
-    assert_eq!(parse_record(&test_record1, &mut record), Ok((&b""[..], ())));
+    assert_eq!(
+        parse_record::<nom::error::VerboseError<_>>(&test_record1, &mut record),
+        Ok((&b""[..], ()))
+    );
     assert_eq!(record.chromosome, b"13");
     assert_eq!(record.position, 32889968);
     assert_eq!(record.id, Vec::<&[u8]>::new());
@@ -556,14 +598,14 @@ fn test_parse_record7() -> Result<(), VCFError> {
 fn test_write() {
     let mut vcf_record = VCFRecord::new(create_header());
     let test_record1 = &b"13\t32889968\t.\tG\tA\t.\t.\tAC=1;AF=0.5\n"[..];
-    parse_record(test_record1, &mut vcf_record).unwrap();
+    parse_record::<nom::error::VerboseError<_>>(test_record1, &mut vcf_record).unwrap();
     let mut write_data = Vec::new();
     vcf_record.write_record(&mut write_data).unwrap();
     assert_eq!(write_data, test_record1);
 
     let test_record2 =
         &b"13\t32889968\t123\tG\tA\t102.0\tLOW,HIGH\tAC=1;AF=0.5\tGT:DP\t1/1:10\t0/1:20\n"[..];
-    parse_record(test_record2, &mut vcf_record).unwrap();
+    parse_record::<nom::error::VerboseError<_>>(test_record2, &mut vcf_record).unwrap();
     let mut write_data = Vec::new();
     vcf_record.write_record(&mut write_data).unwrap();
     assert_eq!(write_data, test_record2);

@@ -112,8 +112,8 @@ impl<R: BufRead> VCFReader<R> {
             return Ok(false);
         }
 
-        record::parse_record(&self.buffer, record)
-            .map_err(|_| VCFErrorKind::RecordParseError(self.current_line))?;
+        record::parse_record::<nom::error::VerboseError<_>>(&self.buffer, record)
+            .map_err(|_e| VCFErrorKind::RecordParseError(self.current_line))?;
 
         Ok(true)
     }

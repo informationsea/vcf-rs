@@ -2,7 +2,7 @@ use super::VCFRecord;
 use crate::U8Vec;
 use nom::{
     self, branch::alt, bytes::complete::is_not, bytes::complete::tag, bytes::complete::take_while1,
-    character::is_digit, combinator::opt, combinator::recognize, eof, named, sequence::tuple,
+    character::is_digit, combinator::opt, combinator::recognize, sequence::tuple,
 };
 use std::str;
 
@@ -207,8 +207,8 @@ where
             take_while1(is_digit),
             opt(tuple((tag(b"."), opt(take_while1(is_digit))))),
             opt(tuple((
-                tag(b"e"),
-                alt((tag("+"), tag("-"))),
+                alt((tag(b"e"), tag(b"E"))),
+                opt(alt((tag("+"), tag("-")))),
                 take_while1(is_digit),
             ))),
         ))),
@@ -309,9 +309,25 @@ where
     Ok((rest, ()))
 }
 
-named!(eof_parser, eof!());
+fn eof<I, E>(data: I) -> nom::IResult<I, I, E>
+where
+    E: nom::error::ParseError<I>,
+    I: nom::InputLength + nom::InputTake,
+{
+    if data.input_len() == 0 {
+        Ok(data.take_split(0))
+    } else {
+        Err(nom::Err::Failure(nom::error::make_error(
+            data,
+            nom::error::ErrorKind::Eof,
+        )))
+    }
+}
 
-pub fn parse_record<'a>(line: &'a [u8], record: &mut VCFRecord) -> nom::IResult<&'a [u8], ()> {
+pub fn parse_record<'a, E>(line: &'a [u8], record: &mut VCFRecord) -> nom::IResult<&'a [u8], ()>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (rest, chromosome) = is_not(&b"\t\r\n"[..])(line)?;
     record.chromosome.clear();
     record.chromosome.extend_from_slice(chromosome);
@@ -348,7 +364,7 @@ pub fn parse_record<'a>(line: &'a [u8], record: &mut VCFRecord) -> nom::IResult<
         record.alternative.clear();
     }
     let (rest, _) = parse_record_optional_columns(rest, record)?;
-    let (rest, _) = alt((tag("\r\n"), tag("\n"), eof_parser))(rest)?;
+    let (rest, _) = alt((tag("\r\n"), tag("\n"), eof))(rest)?;
 
     record.recreate_info_and_genotype_index();
 

@@ -43,7 +43,7 @@ pub fn main() -> Result<(), vcf::VCFError> {
     let writer = GzEncoder::new(File::create(output_vcf_path)?, Compression::default());
     let mut vcf_writer = vcf::VCFWriter::new(writer, &vcf_reader.header())?;
 
-    while let Ok(_) = vcf_reader.next_record(&mut record) {
+    while vcf_reader.next_record(&mut record)? {
         vcf_writer.write_record(&record)?;
     }
 
