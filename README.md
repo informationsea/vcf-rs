@@ -1,7 +1,7 @@
 vcf-rs
 ======
 [![Build](https://github.com/informationsea/vcf-rs/actions/workflows/build.yml/badge.svg)](https://github.com/informationsea/vcf-rs/actions/workflows/build.yml)
-[![Creates.io](http://meritbadge.herokuapp.com/vcf)](https://crates.io/crates/vcf)
+[![Crates.io](https://img.shields.io/crates/v/vcf)](https://crates.io/crates/vcf)
 [![doc-rs](https://docs.rs/vcf/badge.svg)](https://docs.rs/vcf)
 [![GitHub](https://img.shields.io/github/license/informationsea/vcf-rs)](https://github.com/informationsea/vcf-rs)
 [![GitHub top language](https://img.shields.io/github/languages/top/informationsea/vcf-rs)](https://github.com/informationsea/vcf-rs)
