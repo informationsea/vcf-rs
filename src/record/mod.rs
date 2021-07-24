@@ -1,6 +1,6 @@
 mod parser;
 
-use crate::{U8Vec, VCFError, VCFErrorKind, VCFHeader};
+use crate::{U8Vec, VCFError, VCFHeader};
 pub use parser::parse_record;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -52,7 +52,7 @@ impl VCFRecord {
 
     pub fn parse_bytes(&mut self, line: &[u8], line_num: u64) -> Result<(), VCFError> {
         parse_record::<nom::error::VerboseError<_>>(line, self)
-            .map_err(|_| -> VCFError { VCFErrorKind::RecordParseError(line_num).into() })?;
+            .map_err(|_| -> VCFError { VCFError::RecordParseError(line_num).into() })?;
         Ok(())
     }
 

@@ -1,4 +1,4 @@
-use super::{U8Vec, VCFError, VCFErrorKind, VResult};
+use super::{U8Vec, VCFError, VResult};
 use std::collections::{hash_map::Keys, HashMap};
 use std::io::BufRead;
 use std::str::FromStr;
@@ -99,7 +99,7 @@ pub struct VCFHeaderLine {
 impl VCFHeaderLine {
     pub fn from_bytes(line: &[u8], line_num: u64) -> Result<Self, VCFError> {
         parse_header_item(line)
-            .map_err(|_| VCFErrorKind::HeaderParseError(line_num).into())
+            .map_err(|_| VCFError::HeaderParseError(line_num))
             .map(|x| x.1)
     }
     pub fn line(&self) -> &[u8] {
@@ -116,7 +116,7 @@ impl FromStr for VCFHeaderLine {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         parse_header_item(s.as_bytes())
-            .map_err(|_| VCFErrorKind::HeaderParseError(0).into())
+            .map_err(|_| VCFError::HeaderParseError(0))
             .map(|x| x.1)
     }
 }
@@ -299,11 +299,11 @@ pub fn parse_header<R: BufRead>(
         reader.read_until(b'\n', &mut buffer)?;
         if buffer.starts_with(b"##") {
             let item = parser::parse_header_item(&buffer)
-                .map_err::<VCFError, _>(|_| VCFErrorKind::HeaderParseError(line_num).into())?;
+                .map_err::<VCFError, _>(|_| VCFError::HeaderParseError(line_num))?;
             items.push(item.1);
         } else if buffer.starts_with(b"#") {
             let samples = parser::parse_samples(&buffer)
-                .map_err::<VCFError, _>(|_| VCFErrorKind::HeaderParseError(line_num).into())?
+                .map_err::<VCFError, _>(|_| VCFError::HeaderParseError(line_num))?
                 .1;
             return Ok((line_num, None, VCFHeader::new(items, samples)));
         } else {

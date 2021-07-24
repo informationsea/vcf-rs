@@ -4,6 +4,7 @@ use nom::{
     self, branch::alt, bytes::complete::is_not, bytes::complete::tag, bytes::complete::take_while1,
     character::is_digit, combinator::opt, combinator::recognize, sequence::tuple,
 };
+use once_cell::sync::Lazy;
 use std::str;
 
 pub fn parse_separated_values<'a, U, F, G, E>(
@@ -140,9 +141,7 @@ where
     }
 }
 
-lazy_static! {
-    static ref EMPTY_INFO: Vec<(U8Vec, Vec<U8Vec>)> = vec![(b".".to_vec(), vec![])];
-}
+static EMPTY_INFO: Lazy<Vec<(U8Vec, Vec<U8Vec>)>> = Lazy::new(|| vec![(b".".to_vec(), vec![])]);
 
 pub fn parse_info<'a, E>(
     input: &'a [u8],

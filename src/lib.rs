@@ -56,19 +56,13 @@
 //!
 //! ```
 
-#[macro_use]
-extern crate failure;
-
-#[macro_use]
-extern crate lazy_static;
-
 use std::io::prelude::*;
 
 mod error;
 mod header;
 mod record;
 
-pub use error::{VCFError, VCFErrorKind};
+pub use error::VCFError;
 pub use header::{
     Number, VCFHeader, VCFHeaderContent, VCFHeaderFilterAlt, VCFHeaderInfoFormat, VCFHeaderLine,
     VCFVersion, ValueType,
@@ -113,7 +107,7 @@ impl<R: BufRead> VCFReader<R> {
         }
 
         record::parse_record::<nom::error::VerboseError<_>>(&self.buffer, record)
-            .map_err(|_e| VCFErrorKind::RecordParseError(self.current_line))?;
+            .map_err(|_e| VCFError::RecordParseError(self.current_line))?;
 
         Ok(true)
     }
