@@ -1,6 +1,6 @@
 [package]
 name = "vcf"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["OKAMURA, Yasunobu <okamura@informationsea.info>"]
 edition = "2018"
 license = "Apache-2.0"
