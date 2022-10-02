@@ -1,7 +1,7 @@
 use super::*;
 use nom::{
     self, branch::alt, bytes::complete::is_not, bytes::complete::tag, bytes::complete::take_while,
-    character::is_digit, combinator::map, combinator::opt, multi::separated_list,
+    character::is_digit, combinator::eof, combinator::map, combinator::opt, multi::separated_list0,
     sequence::separated_pair, sequence::tuple,
 };
 use std::str;
@@ -12,7 +12,7 @@ pub fn parse_header_item(header_line: &[u8]) -> VResult<&[u8], VCFHeaderLine> {
     let line = header_line.to_vec();
     let (rest, _) = tag("##")(header_line)?;
     let (rest, contents) = parse_header_content(rest)?;
-    let (rest, _) = alt((tag("\r\n"), tag("\n")))(rest)?;
+    let (rest, _) = alt((tag("\r\n"), tag("\n"), eof))(rest)?;
     Ok((rest, VCFHeaderLine { line, contents }))
 }
 
@@ -29,7 +29,7 @@ pub fn parse_header_content(header_line_without_sharp: &[u8]) -> VResult<&[u8], 
 }
 
 pub fn parse_header_entries(value: &[u8]) -> VResult<&[u8], Vec<EntryPair>> {
-    separated_list(
+    separated_list0(
         tag(b","),
         separated_pair(
             is_not(&b">,= \r\n\t"[..]),
@@ -225,7 +225,7 @@ pub fn parse_samples(header_line: &[u8]) -> VResult<&[u8], Vec<U8Vec>> {
                         tag("\tFORMAT"),
                         opt(tuple((
                             tag("\t"),
-                            separated_list(tag("\t"), is_not(&b"\t\r\n"[..])),
+                            separated_list0(tag("\t"), is_not(&b"\t\r\n"[..])),
                         ))),
                     ))),
                 ))),

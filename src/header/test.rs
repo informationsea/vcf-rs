@@ -21,6 +21,12 @@ fn test_header_item_parser() {
             line: b"##fileformat=VCFv4.2\n".to_vec()
         }
     );
+
+    VCFHeaderLine::from_bytes(
+        b"##INFO=<ID=IMPR,Number=0,Type=Flag,Description=\"Imprecise\">",
+        1,
+    )
+    .unwrap();
 }
 
 #[test]
